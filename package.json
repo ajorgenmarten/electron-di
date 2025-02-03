@@ -1,7 +1,7 @@
 {
-  "name": "electron-ipc-manager",
-  "version": "0.0.1",
-  "description": "",
+  "name": "electron-di",
+  "version": "1.0.0",
+  "description": "Util para brindar tu aplicación de Electron hecha con npm create electron-vite la capacidad de inyectar dependecias y controladores de IPC",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -16,7 +16,12 @@
   "scripts": {
     "build": "tsup"
   },
-  "keywords": [],
+  "keywords": [
+    "electron",
+    "ipc",
+    "decorators",
+    "dependency injection"
+  ],
   "author": "Alejandro Jorgen Marten",
   "license": "ISC",
   "devDependencies": {

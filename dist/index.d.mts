@@ -11,12 +11,17 @@ interface IProvider {
     useClass: IClass;
 }
 
+declare class ModuleContainer {
+    private readonly instances;
+    private readonly providers;
+    registerDependency(provider: IClass | IProvider): void;
+    resolveDependency(token: string | IAbstractClass | IClass): any;
+}
 declare class DependencyInjector {
     private readonly container;
-    register(token: string, cls: IClass): void;
-    resolveDepenedency(token: string): any;
-    updateToken(token: string, cls: IClass): void;
-    get Container(): Map<string, IClass>;
+    registerModule(classModule: IClass): void;
+    resolveDependency(classModule: IClass, token: string | IClass | IAbstractClass): any;
+    get Container(): Map<string, ModuleContainer>;
 }
 declare const container: DependencyInjector;
 

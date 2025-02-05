@@ -1,110 +1,134 @@
-import { CLASS_METADATA_KEY } from "./constants"
-import { IAbstractClass, IClass, IModuleOptions, IProvider, IDecorateMetadata } from "./types"
-import { ElectronDIError, Logger } from "./utils"
+import { CLASS_METADATA_KEY } from "./constants";
+import { IAbstractClass, IClass, IModuleOptions, IProvider, IDecorateMetadata } from "./types";
+import { ElectronDIError, Logger } from "./utils";
 
 class ModuleContainer {
-    private readonly instances: Map<string, any> = new Map()
-    private readonly providers: Map<string, IClass> = new Map()
+    private readonly instances: Map<string, any> = new Map();
+    private readonly providers: Map<string, IClass> = new Map();
 
+    /**
+     * Registra una dependencia en el contenedor de módulos.
+     * @param provider Clase o proveedor a registrar.
+     */
     registerDependency(provider: IClass | IProvider) {
-        // OBTENER EL IDENTIFICADOR Y LA CLASE
+        // Obtener el identificador y la clase.
         const [useClass, token] = typeof provider === 'function'
-        ? [provider, provider.name]
-        : [provider.useClass, provider.provide.name];
+            ? [provider, provider.name]
+            : [provider.useClass, provider.provide.name];
 
-        // COMPROBAR SI YA SE ENCUENTRA REGISTRADO
-        if (this.providers.has(token)) return
+        // Comprobar si ya se encuentra registrado.
+        if (this.providers.has(token)) return;
 
-        // OBTENER LA METADATA DE LA CLASE
-        const metadata: IDecorateMetadata = Reflect.getMetadata(CLASS_METADATA_KEY, useClass)
+        // Obtener la metadata de la clase.
+        const metadata: IDecorateMetadata = Reflect.getMetadata(CLASS_METADATA_KEY, useClass);
         
-        // VERIFICAR SI TIENE METADATA
-        if (metadata === undefined) throw new ElectronDIError(`Decorate class "${useClass.name}" with @Injectable o @Controller`)
+        // Verificar si tiene metadata.
+        if (metadata === undefined) throw new ElectronDIError(`Decorate class "${useClass.name}" with @Injectable or @Controller`);
 
-        // VERIFICAR QUE SEA DECORADA CON INJECTABLE O CONTROLLER
-        if (metadata.type === "module") throw new ElectronDIError(`Decorate class "${useClass.name}" with @Injectable o @Controller`)
+        // Verificar que sea decorada con @Injectable o @Controller.
+        if (metadata.type === "module") throw new ElectronDIError(`Decorate class "${useClass.name}" with @Injectable or @Controller`);
 
-        // REGISTRAR EL PROVEEDOR
-        this.providers.set(token, useClass)
+        // Registrar el proveedor.
+        this.providers.set(token, useClass);
     }
 
+    /**
+     * Resuelve una dependencia y devuelve una instancia de ella.
+     * @param token Identificador o clase de la dependencia a resolver.
+     * @returns Instancia de la dependencia.
+     */
     resolveDependency(token: string | IAbstractClass | IClass) {
-        // OBTENER EL IDENTIFICADOR
-        const key = typeof token === "string" ? token : token.name
+        // Obtener el identificador.
+        const key = typeof token === "string" ? token : token.name;
 
-        // VERIFICAR SI YA SE ENCUENTRA UNA INSTANCIA
-        if (this.instances.has(key)) return this.instances.get(key)
+        // Verificar si ya se encuentra una instancia.
+        if (this.instances.has(key)) return this.instances.get(key);
 
-        // OBTENER EL PROVEEDOR
+        // Obtener el proveedor.
         const provider = this.providers.get(key);
         
-        // COMPROBAR SI EL PROVEEDOR ESTA REGISTRADO
+        // Comprobar si el proveedor está registrado.
         if (provider === undefined) 
-            throw new ElectronDIError(`Dependency for "${key}" not registered. Use @Injectable or @Controller`)
+            throw new ElectronDIError(`Dependency for "${key}" not registered. Use @Injectable or @Controller`);
 
-        // OBTENER METADATA DEL PROVEEDOR
-        const providerMetadata: IDecorateMetadata = Reflect.getMetadata(CLASS_METADATA_KEY, provider)
+        // Obtener metadata del proveedor.
+        const providerMetadata: IDecorateMetadata = Reflect.getMetadata(CLASS_METADATA_KEY, provider);
 
         let instance = null;
         
-        // COMPROBAR SI LA CLASE REQUIERE DEPENDENCIAS
+        // Comprobar si la clase requiere dependencias.
         if (providerMetadata.dependencies === undefined) {
-            instance = new provider()
-            this.instances.set(key, instance)
-            return instance
+            instance = new provider();
+            this.instances.set(key, instance);
+            return instance;
         }
 
         const instances: any[] = providerMetadata.dependencies.map((value: IClass | IAbstractClass) => {
-            return this.resolveDependency(value)
-        })
-        instance = new provider(...instances)
-        this.instances.set(key, instance)
-        return instance
+            return this.resolveDependency(value);
+        });
+        instance = new provider(...instances);
+        this.instances.set(key, instance);
+        return instance;
     }
 }
-class DependencyInjector {
-    private readonly container: Map<string, ModuleContainer> = new Map()
 
+class DependencyInjector {
+    private readonly container: Map<string, ModuleContainer> = new Map();
+
+    /**
+     * Registra un módulo en el contenedor.
+     * @param classModule Clase del módulo a registrar.
+     */
     registerModule(classModule: IClass) {
         const token = classModule.name;
         if (this.container.has(token)) return;
 
-        const moduleMetadata: IDecorateMetadata = Reflect.getMetadata(CLASS_METADATA_KEY, classModule)
+        const moduleMetadata: IDecorateMetadata = Reflect.getMetadata(CLASS_METADATA_KEY, classModule);
 
-        // VERIFICAR SI TIENE METADATOS
-        if (moduleMetadata === undefined) throw new ElectronDIError(`Class "${classModule.name}" is not decorate with @Module()`)
+        // Verificar si tiene metadatos.
+        if (moduleMetadata === undefined) throw new ElectronDIError(`Class "${classModule.name}" is not decorated with @Module()`);
 
-        // VERIFICAR SI ES UN MODULO
+        // Verificar si es un módulo.
         const decorateWith = moduleMetadata.type == 'module'
-        ? "@Module"
-        : moduleMetadata.type == 'controller'
-        ? "@Controller"
-        : "@Injectable"
-        if (moduleMetadata.type !== "module") throw new ElectronDIError(`Class "${classModule.name}" is decorate with "${decorateWith}"`)
+            ? "@Module"
+            : moduleMetadata.type == 'controller'
+            ? "@Controller"
+            : "@Injectable";
+        if (moduleMetadata.type !== "module") throw new ElectronDIError(`Class "${classModule.name}" is decorated with "${decorateWith}"`);
 
-        // CREAR CONTENEDOR DE DEPENDECIAS PARA EL MODULO
-        const moduleContainer = new ModuleContainer()
+        // Crear contenedor de dependencias para el módulo.
+        const moduleContainer = new ModuleContainer();
 
-        // REGISTRER LOS PROVIDERS Y LOS CONTROLLERS EN EL CONTENEDOR
+        // Registrar los providers y los controllers en el contenedor.
         moduleMetadata.options?.providers?.forEach(provider => {
-            moduleContainer.registerDependency(provider)
-        })
+            moduleContainer.registerDependency(provider);
+        });
         moduleMetadata.options?.controllers?.forEach(controller => {
-            moduleContainer.registerDependency(controller)
-        })
-        Logger(`Module "${classModule.name}" registered.`)
-        this.container.set(token, moduleContainer)
+            moduleContainer.registerDependency(controller);
+        });
+        Logger(`Module "${classModule.name}" registered.`);
+        this.container.set(token, moduleContainer);
     }
 
+    /**
+     * Resuelve una dependencia en un módulo específico.
+     * @param classModule Clase del módulo.
+     * @param token Identificador o clase de la dependencia a resolver.
+     * @returns Instancia de la dependencia.
+     */
     resolveDependency(classModule: IClass, token: string | IClass | IAbstractClass) {
-        const moduleContainer = this.container.get(classModule.name)
-        if (moduleContainer === undefined) throw new ElectronDIError(`Module "${classModule.name}" has not provided.`)
-        return moduleContainer.resolveDependency(token)
+        const moduleContainer = this.container.get(classModule.name);
+        if (moduleContainer === undefined) throw new ElectronDIError(`Module "${classModule.name}" has not been provided.`);
+        return moduleContainer.resolveDependency(token);
     }
 
+    /**
+     * Obtiene el contenedor de módulos.
+     * @returns Contenedor de módulos.
+     */
     get Container() {
-        return this.container
+        return this.container;
     }
 }
 
-export const container = new DependencyInjector()
+export const container = new DependencyInjector();

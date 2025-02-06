@@ -60,4 +60,16 @@ export interface IDecorateMetadata {
   decorates?: IElectronMetadataItem[];
   dependencies?: (IClass | IAbstractClass)[];
   options?: IModuleOptions;
+  middleware?: IMiddlewareItem[];
+}
+
+export type IMiddlewareItem = IClass | IAbstractClass | IMiddlewareMethod;
+
+export interface IMiddlewareMethod {
+  method: string;
+  token: IClass | IAbstractClass;
+}
+
+export abstract class CanActivate {
+  abstract execute(event: any, ...args: any[]): Promise<boolean> | boolean;
 }

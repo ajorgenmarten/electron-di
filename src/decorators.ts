@@ -1,5 +1,5 @@
 import { CLASS_METADATA_KEY } from "./constants";
-import { IAbstractClass, IClass, IDecorateMetadata, IElectronMetadataItem, IModuleOptions } from "./types";
+import { IAbstractClass, IClass, IDecorateMetadata, IElectronMetadataItem, IMiddlewareItem, IModuleOptions } from "./types";
 
 /**
  * Decorador para inyectar dependencias en los parámetros del constructor de una clase.
@@ -121,7 +121,7 @@ export function Controller(prefix?: string) {
  * 
  */
 export function OnInvoke(channel: string) {
-    return function (target: any, propertyKey: string) {
+    return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
         const decorate: IElectronMetadataItem = { channel, method: propertyKey, type: 'invoke' };
         let metadata: IDecorateMetadata | undefined = Reflect.getMetadata(CLASS_METADATA_KEY, target);
         if (metadata === undefined) {
@@ -168,6 +168,25 @@ export function OnSend(channel: string) {
             Reflect.defineMetadata(CLASS_METADATA_KEY, metadata, target);
         }
     };
+}
+
+export function Middleware(token: IClass | IAbstractClass) {
+    return function (target: any, propertyKey?: string) {
+        let metadata: IDecorateMetadata = Reflect.getMetadata(CLASS_METADATA_KEY, target);
+        if (metadata == undefined) {
+            metadata = { type: 'controller', middleware: [] };
+        }
+        if (!Array.isArray(metadata.middleware)) {
+            metadata.middleware = [];
+        }
+        let middleware: IMiddlewareItem;
+        if (propertyKey === undefined)
+            middleware = token;
+        else
+            middleware = { method: propertyKey, token: token };
+        metadata.middleware.push(middleware);
+        Reflect.defineMetadata(CLASS_METADATA_KEY, metadata, target);
+    }
 }
 
 /**

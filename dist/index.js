@@ -55,9 +55,11 @@ var __async = (__this, __arguments, generator) => {
 var index_exports = {};
 __export(index_exports, {
   Bootstrap: () => Bootstrap,
+  CanActivate: () => CanActivate,
   Controller: () => Controller,
   Inject: () => Inject,
   Injectable: () => Injectable,
+  Middleware: () => Middleware,
   Module: () => Module,
   OnInvoke: () => OnInvoke,
   OnSend: () => OnSend,
@@ -201,7 +203,7 @@ function Controller(prefix) {
   };
 }
 function OnInvoke(channel) {
-  return function(target, propertyKey) {
+  return function(target, propertyKey, descriptor) {
     const decorate = { channel, method: propertyKey, type: "invoke" };
     let metadata = Reflect.getMetadata(CLASS_METADATA_KEY, target);
     if (metadata === void 0) {
@@ -228,6 +230,24 @@ function OnSend(channel) {
     }
   };
 }
+function Middleware(token) {
+  return function(target, propertyKey) {
+    let metadata = Reflect.getMetadata(CLASS_METADATA_KEY, target);
+    if (metadata == void 0) {
+      metadata = { type: "controller", middleware: [] };
+    }
+    if (!Array.isArray(metadata.middleware)) {
+      metadata.middleware = [];
+    }
+    let middleware;
+    if (propertyKey === void 0)
+      middleware = token;
+    else
+      middleware = { method: propertyKey, token };
+    metadata.middleware.push(middleware);
+    Reflect.defineMetadata(CLASS_METADATA_KEY, metadata, target);
+  };
+}
 function Module(options) {
   return function(target) {
     const setMetadata = { type: "module", options };
@@ -246,14 +266,32 @@ function Bootstrap(...modules) {
       const { type, prefix } = Reflect.getMetadata(CLASS_METADATA_KEY, controller);
       if (type !== "controller") throw new ElectronDIError(`Decorate class "${controller.name}" with @Controller`);
       const resolved = container.resolveDependency(module2, controller);
-      const { decorates } = Reflect.getMetadata(CLASS_METADATA_KEY, resolved);
+      const { decorates, middleware } = Reflect.getMetadata(CLASS_METADATA_KEY, resolved);
       decorates == null ? void 0 : decorates.forEach(function(value) {
         const channel = prefix ? `${prefix}:${value.channel}` : value.channel;
         const method = resolved[value.method];
         const handler = method.bind(resolved);
+        const middlewares = middleware == null ? void 0 : middleware.filter(function(m) {
+          if (typeof m === "function") return true;
+          return m.method === value.method;
+        });
+        function excecuteMiddlewares(event, ...args) {
+          return __async(this, null, function* () {
+            if (!Array.isArray(middlewares)) return true;
+            for (const middleware2 of middlewares) {
+              const token = typeof middleware2 === "function" ? middleware2 : middleware2.token;
+              const middlewareHandler = container.resolveDependency(module2, token);
+              const result = yield middlewareHandler.execute(event, ...args);
+              if (result === false) return false;
+            }
+            return true;
+          });
+        }
         if (value.type === "invoke") {
           import_electron.ipcMain.handle(channel, function(event, ...args) {
             return __async(this, null, function* () {
+              const result = yield excecuteMiddlewares(event, ...args);
+              if (result === false) return;
               const returnValue = yield handler(event, ...args);
               return returnValue;
             });
@@ -262,21 +300,29 @@ function Bootstrap(...modules) {
         if (value.type === "send") {
           import_electron.ipcMain.on(channel, function(event, ...args) {
             return __async(this, null, function* () {
+              const result = yield excecuteMiddlewares(event, ...args);
+              if (result === false) return;
               yield handler(event, ...args);
             });
           });
         }
-        Logger(`Listen for ipc.${value.type} in channel: ${channel}`);
+        Logger(`Listen for ipcRenderer.${value.type}("${channel}", ...args: any[])`);
       });
     });
   }
 }
+
+// src/types.ts
+var CanActivate = class {
+};
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   Bootstrap,
+  CanActivate,
   Controller,
   Inject,
   Injectable,
+  Middleware,
   Module,
   OnInvoke,
   OnSend,

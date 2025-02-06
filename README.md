@@ -73,6 +73,63 @@ export class AppModule {}
 Bootstrap(AppModule);
 ```
 
+### Un ejemplo de codigo completo
+```typescript
+import { OnInvoke, Injectable, Inject, Controller as Ctrl, Module, Middleware as Mdlw, CanActivate } from 'electron-di'
+
+abstract class Repository {
+    abstract findAll(): Promise<any[]>
+}
+
+@Injectable()
+class Middleware implements CanActivate {
+    constructor(@Inject(Repository) private repository: Repository) { }
+    async execute() {
+        console.log('Middleware', await this.repository.findAll())
+        return true
+    }
+}
+
+@Injectable()
+class Service {
+    constructor(@Inject(Repository) private repository: Repository) { }
+
+    async doSomething() {
+        const data = await this.repository.findAll()
+        return data
+    }
+}
+
+@Ctrl()
+class Controller {
+    constructor(@Inject(Service) private service: Service) { }
+
+    @Mdlw(Middleware)
+    @OnInvoke('test')
+    async test() {
+        const data = await this.service.doSomething()
+        return data
+    }
+}
+
+@Injectable()
+class RepositoryImpl implements Repository {
+    async findAll() {
+        return [1, 2, 3]
+    }
+}
+
+@Module({
+    providers: [
+        { provide: Repository, useClass: RepositoryImpl },
+        Service,
+        Middleware,
+    ],
+    controllers: [Controller],
+})
+export class ExampleModule {}
+```
+
 ## Contribuciones
 
 Si deseas contribuir a este proyecto, por favor sigue estos pasos:

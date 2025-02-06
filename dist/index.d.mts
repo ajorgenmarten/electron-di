@@ -34,6 +34,9 @@ interface IProvider {
      */
     useClass: IClass;
 }
+declare abstract class CanActivate {
+    abstract execute(event: any, ...args: any[]): Promise<boolean> | boolean;
+}
 
 declare class ModuleContainer {
     private readonly instances;
@@ -158,7 +161,7 @@ declare function Controller(prefix?: string): (target: IClass) => void;
  * }
  *
  */
-declare function OnInvoke(channel: string): (target: any, propertyKey: string) => void;
+declare function OnInvoke(channel: string): (target: any, propertyKey: string, descriptor: PropertyDescriptor) => void;
 /**
  * Decorador para registrar un método como un manejador de mensajes IPC de tipo "send".
  * Este decorador asocia un canal IPC con un método de la clase.
@@ -180,6 +183,7 @@ declare function OnInvoke(channel: string): (target: any, propertyKey: string) =
  *
  */
 declare function OnSend(channel: string): (target: any, propertyKey: string) => void;
+declare function Middleware(token: IClass | IAbstractClass): (target: any, propertyKey?: string) => void;
 /**
  * Decorador para definir un módulo en la aplicación.
  * Este decorador registra la clase como un módulo y permite configurar proveedores y controladores.
@@ -204,4 +208,4 @@ declare function Module(options: IModuleOptions): (target: IClass) => void;
  */
 declare function Bootstrap(...modules: IClass[]): void;
 
-export { Bootstrap, Controller, Inject, Injectable, Module, OnInvoke, OnSend, container };
+export { Bootstrap, CanActivate, Controller, Inject, Injectable, Middleware, Module, OnInvoke, OnSend, container };

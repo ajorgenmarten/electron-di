@@ -106,7 +106,7 @@ class DependencyInjector {
         moduleMetadata.options?.controllers?.forEach(controller => {
             moduleContainer.registerDependency(controller);
         });
-        Logger(`Module "${classModule.name}" registered.`);
+        Logger.success(`module: [${classModule.name}] registered.`, 'ELECTRON DI');
         this.container.set(token, moduleContainer);
     }
 

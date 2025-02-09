@@ -50,9 +50,9 @@ export function Bootstrap(...modules: IClass[]) {
                 }
 
                 async function excecuteMethodMiddlewares(event: any, ...args: any[]): Promise<boolean> {
+                    if (!Array.isArray(middlewares)) return true;
                     for (const middleware of middlewares) {
-                        const token = middleware.token;
-                        const middlewareHandler = container.resolveDependency(module, token);
+                        const middlewareHandler = container.resolveDependency(module, middleware.token);
                         const result = await middlewareHandler.execute(event, ...args);
                         if (result === false) return false;
                     }
@@ -86,7 +86,8 @@ export function Bootstrap(...modules: IClass[]) {
                         await handler(event, ...args);
                     });
                 }
-                Logger(`Listen for ipcRenderer.${value.type}("${channel}", ...args: any[])`);
+
+                Logger.info(`type: [${value.type}] channel: [${channel}] controller: [${controller.name}] method: [${value.method}]`, 'IPC Listener');
             });
         });
     }    

@@ -1,6 +1,6 @@
 {
   "name": "electron-di",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Util para brindar tu aplicación de Electron hecha con npm create electron-vite la capacidad de inyectar dependecias y controladores de IPC",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

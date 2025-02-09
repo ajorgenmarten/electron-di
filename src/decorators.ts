@@ -179,12 +179,10 @@ export function Middleware(token: IClass | IAbstractClass) {
         if (!Array.isArray(metadata.middleware)) {
             metadata.middleware = [];
         }
-        let middleware: IMiddlewareItem;
         if (propertyKey === undefined)
-            middleware = token;
+            metadata.middleware.push(token);
         else
-            middleware = { method: propertyKey, token: token };
-        metadata.middleware.push(middleware);
+            metadata.middleware.push({ method: propertyKey, token });
         Reflect.defineMetadata(CLASS_METADATA_KEY, metadata, target);
     }
 }

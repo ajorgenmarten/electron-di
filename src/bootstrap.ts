@@ -1,6 +1,6 @@
 import { ipcMain } from "electron";
 import { container } from "./container";
-import { IClass, IDecorateMetadata, IModuleOptions } from "./types";
+import { IAbstractClass, IClass, IDecorateMetadata, IMiddlewareMethod } from "./types";
 import { CLASS_METADATA_KEY } from "./constants";
 import { ElectronDIError, Logger } from "./utils";
 
@@ -19,7 +19,7 @@ export function Bootstrap(...modules: IClass[]) {
         // Registrar controladores definidos en las opciones del módulo.
         options?.controllers?.forEach(function(controller) {
             // Obtener la metadata del controlador.
-            const { type, prefix }: IDecorateMetadata = Reflect.getMetadata(CLASS_METADATA_KEY, controller);
+            const { type, prefix, middleware: classMiddlewares }: IDecorateMetadata = Reflect.getMetadata(CLASS_METADATA_KEY, controller);
 
             // Verificar si la clase está decorada como controlador.
             if (type !== 'controller') throw new ElectronDIError(`Decorate class "${controller.name}" with @Controller`);
@@ -28,26 +28,44 @@ export function Bootstrap(...modules: IClass[]) {
             const resolved = container.resolveDependency(module, controller);
             
             // Obtener la metadata de decoradores del controlador resuelto.
-            const { decorates, middleware }: IDecorateMetadata = Reflect.getMetadata(CLASS_METADATA_KEY, resolved);
+            const { decorates, middleware: methodMiddlewares }: IDecorateMetadata = Reflect.getMetadata(CLASS_METADATA_KEY, resolved);
 
             // Registrar manejadores para los canales IPC definidos en los decoradores.
             decorates?.forEach(function(value) {
                 const channel = prefix ? `${prefix}:${value.channel}` : value.channel;
                 const method = resolved[value.method];
                 const handler = method.bind(resolved);
-                const middlewares = middleware?.filter(function (m) {
-                    if (typeof m === 'function') return true;
+                const middlewares = (methodMiddlewares as IMiddlewareMethod[])?.filter(function (m) {
                     return m.method === value.method;
                 })
 
-                async function excecuteMiddlewares(event: any, ...args: any[]): Promise<boolean> {
-                    if (!Array.isArray(middlewares)) return true;
+                async function excecuteClassMiddlewares(event: any, ...args: any[]): Promise<boolean> {
+                    if (!Array.isArray(classMiddlewares)) return true;
+                    for (const middleware of (classMiddlewares as (IClass | IAbstractClass)[])) {
+                        const middlewareHandler = container.resolveDependency(module, middleware);
+                        const result = await middlewareHandler.execute(event, ...args);
+                        if (result === false) return false;
+                    }
+                    return true;
+                }
+
+                async function excecuteMethodMiddlewares(event: any, ...args: any[]): Promise<boolean> {
                     for (const middleware of middlewares) {
-                        const token = typeof middleware === 'function' ? middleware : middleware.token;
+                        const token = middleware.token;
                         const middlewareHandler = container.resolveDependency(module, token);
                         const result = await middlewareHandler.execute(event, ...args);
                         if (result === false) return false;
                     }
+                    return true;
+                }
+
+                async function excecuteMiddlewares(event: any, ...args: any[]): Promise<boolean> {
+                    const classMiddlewaresResult = await excecuteClassMiddlewares(event, ...args);
+                    if (classMiddlewaresResult === false) return false;
+
+                    const methodMiddlewaresResult = await excecuteMethodMiddlewares(event, ...args);
+                    if (methodMiddlewaresResult === false) return false;
+
                     return true;
                 }
 

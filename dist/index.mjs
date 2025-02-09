@@ -233,27 +233,45 @@ function Bootstrap(...modules) {
     const { options } = Reflect.getMetadata(CLASS_METADATA_KEY, module);
     container.registerModule(module);
     (_a = options == null ? void 0 : options.controllers) == null ? void 0 : _a.forEach(function(controller) {
-      const { type, prefix } = Reflect.getMetadata(CLASS_METADATA_KEY, controller);
+      const { type, prefix, middleware: classMiddlewares } = Reflect.getMetadata(CLASS_METADATA_KEY, controller);
       if (type !== "controller") throw new ElectronDIError(`Decorate class "${controller.name}" with @Controller`);
       const resolved = container.resolveDependency(module, controller);
-      const { decorates, middleware } = Reflect.getMetadata(CLASS_METADATA_KEY, resolved);
+      const { decorates, middleware: methodMiddlewares } = Reflect.getMetadata(CLASS_METADATA_KEY, resolved);
       decorates == null ? void 0 : decorates.forEach(function(value) {
         const channel = prefix ? `${prefix}:${value.channel}` : value.channel;
         const method = resolved[value.method];
         const handler = method.bind(resolved);
-        const middlewares = middleware == null ? void 0 : middleware.filter(function(m) {
-          if (typeof m === "function") return true;
+        const middlewares = methodMiddlewares == null ? void 0 : methodMiddlewares.filter(function(m) {
           return m.method === value.method;
         });
-        function excecuteMiddlewares(event, ...args) {
+        function excecuteClassMiddlewares(event, ...args) {
           return __async(this, null, function* () {
-            if (!Array.isArray(middlewares)) return true;
-            for (const middleware2 of middlewares) {
-              const token = typeof middleware2 === "function" ? middleware2 : middleware2.token;
+            if (!Array.isArray(classMiddlewares)) return true;
+            for (const middleware of classMiddlewares) {
+              const middlewareHandler = container.resolveDependency(module, middleware);
+              const result = yield middlewareHandler.execute(event, ...args);
+              if (result === false) return false;
+            }
+            return true;
+          });
+        }
+        function excecuteMethodMiddlewares(event, ...args) {
+          return __async(this, null, function* () {
+            for (const middleware of middlewares) {
+              const token = middleware.token;
               const middlewareHandler = container.resolveDependency(module, token);
               const result = yield middlewareHandler.execute(event, ...args);
               if (result === false) return false;
             }
+            return true;
+          });
+        }
+        function excecuteMiddlewares(event, ...args) {
+          return __async(this, null, function* () {
+            const classMiddlewaresResult = yield excecuteClassMiddlewares(event, ...args);
+            if (classMiddlewaresResult === false) return false;
+            const methodMiddlewaresResult = yield excecuteMethodMiddlewares(event, ...args);
+            if (methodMiddlewaresResult === false) return false;
             return true;
           });
         }

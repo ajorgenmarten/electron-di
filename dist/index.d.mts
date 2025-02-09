@@ -208,4 +208,12 @@ declare function Module(options: IModuleOptions): (target: IClass) => void;
  */
 declare function Bootstrap(...modules: IClass[]): void;
 
-export { Bootstrap, CanActivate, Controller, Inject, Injectable, Middleware, Module, OnInvoke, OnSend, container };
+declare class Logger {
+    static log(message: string, title?: string): void;
+    static info(message: string, title?: string): void;
+    static success(message: string, title?: string): void;
+    static error(message: string, title?: string): void;
+    static warn(message: string, title?: string): void;
+}
+
+export { Bootstrap, CanActivate, Controller, Inject, Injectable, Logger, Middleware, Module, OnInvoke, OnSend, container };

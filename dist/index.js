@@ -59,6 +59,7 @@ __export(index_exports, {
   Controller: () => Controller,
   Inject: () => Inject,
   Injectable: () => Injectable,
+  Logger: () => Logger,
   Middleware: () => Middleware,
   Module: () => Module,
   OnInvoke: () => OnInvoke,
@@ -72,9 +73,87 @@ var import_reflect_metadata = require("reflect-metadata");
 var CLASS_METADATA_KEY = Symbol("electron:classmetadata");
 
 // src/utils.ts
-function Logger(message, title) {
-  console.log(`[${title || "ELECTRON DI"}]: 	 ${message}`);
-}
+var COLORS = {
+  BACKGROUND: {
+    LIGHT: {
+      BLACK: "100",
+      RED: "101",
+      GREEN: "102",
+      YELLOW: "103",
+      BLUE: "104",
+      MAGENTA: "105",
+      CYAN: "106",
+      WHITE: "107",
+      DEFAULT: "109"
+    },
+    DARK: {
+      BLACK: "40",
+      RED: "41",
+      GREEN: "42",
+      YELLOW: "43",
+      BLUE: "44",
+      MAGENTA: "45",
+      CYAN: "46",
+      WHITE: "47",
+      DEFAULT: "49"
+    }
+  },
+  FOREGROUND: {
+    LIGHT: {
+      BLACK: "90",
+      RED: "91",
+      GREEN: "92",
+      YELLOW: "93",
+      BLUE: "94",
+      MAGENTA: "95",
+      CYAN: "96",
+      WHITE: "97",
+      DEFAULT: "99"
+    },
+    DARK: {
+      BLACK: "30",
+      RED: "31",
+      GREEN: "32",
+      YELLOW: "33",
+      BLUE: "34",
+      MAGENTA: "35",
+      CYAN: "36",
+      WHITE: "37",
+      DEFAULT: "39"
+    }
+  }
+};
+var genTheme = (font, background) => {
+  const theme = [
+    font ? COLORS.FOREGROUND[font.colorType][font.colorValue] : void 0,
+    background ? COLORS.BACKGROUND[background.colorType][background.colorValue] : void 0
+  ].filter(Boolean).join(";");
+  return theme ? `\x1B[${theme}]%s\x1B[0m` : `%s`;
+};
+var THEMES = {
+  log: genTheme({ colorType: "LIGHT", colorValue: "BLACK" }),
+  success: genTheme({ colorType: "LIGHT", colorValue: "GREEN" }),
+  error: genTheme({ colorType: "LIGHT", colorValue: "RED" }),
+  info: genTheme({ colorType: "LIGHT", colorValue: "BLUE" }),
+  warn: genTheme({ colorType: "LIGHT", colorValue: "YELLOW" })
+};
+var Logger = class {
+  static log(message, title) {
+    console.log(`${THEMES.log}:	${message}`, title);
+  }
+  static info(message, title) {
+    console.log(`${THEMES.info}:	${message}`, title);
+  }
+  static success(message, title) {
+    console.log(`${THEMES.success}:	${message}`, title);
+  }
+  static error(message, title) {
+    console.log(`${THEMES.error}:	${message}`, title);
+  }
+  static warn(message, title) {
+    console.log(`${THEMES.warn}:	${message}`, title);
+  }
+};
 var ElectronDIError = class extends Error {
   constructor(message) {
     super(`[ELECTRON DI]: 	 ${message}`);
@@ -148,7 +227,7 @@ var DependencyInjector = class {
     (_d = (_c = moduleMetadata.options) == null ? void 0 : _c.controllers) == null ? void 0 : _d.forEach((controller) => {
       moduleContainer.registerDependency(controller);
     });
-    Logger(`Module "${classModule.name}" registered.`);
+    Logger.success(`module: [${classModule.name}] registered.`, "ELECTRON DI");
     this.container.set(token, moduleContainer);
   }
   /**
@@ -239,12 +318,10 @@ function Middleware(token) {
     if (!Array.isArray(metadata.middleware)) {
       metadata.middleware = [];
     }
-    let middleware;
     if (propertyKey === void 0)
-      middleware = token;
+      metadata.middleware.push(token);
     else
-      middleware = { method: propertyKey, token };
-    metadata.middleware.push(middleware);
+      metadata.middleware.push({ method: propertyKey, token });
     Reflect.defineMetadata(CLASS_METADATA_KEY, metadata, target);
   };
 }
@@ -287,9 +364,9 @@ function Bootstrap(...modules) {
         }
         function excecuteMethodMiddlewares(event, ...args) {
           return __async(this, null, function* () {
+            if (!Array.isArray(middlewares)) return true;
             for (const middleware of middlewares) {
-              const token = middleware.token;
-              const middlewareHandler = container.resolveDependency(module2, token);
+              const middlewareHandler = container.resolveDependency(module2, middleware.token);
               const result = yield middlewareHandler.execute(event, ...args);
               if (result === false) return false;
             }
@@ -324,7 +401,7 @@ function Bootstrap(...modules) {
             });
           });
         }
-        Logger(`Listen for ipcRenderer.${value.type}("${channel}", ...args: any[])`);
+        Logger.info(`type: [${value.type}] channel: [${channel}] controller: [${controller.name}] method: [${value.method}]`, "IPC Listener");
       });
     });
   }
@@ -340,6 +417,7 @@ var CanActivate = class {
   Controller,
   Inject,
   Injectable,
+  Logger,
   Middleware,
   Module,
   OnInvoke,

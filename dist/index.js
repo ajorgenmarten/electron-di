@@ -128,7 +128,7 @@ var genTheme = ({ font, background }) => {
     font ? COLORS.FOREGROUND[font.colorType][font.colorValue] : void 0,
     background ? COLORS.BACKGROUND[background.colorType][background.colorValue] : void 0
   ].filter(Boolean).join(";");
-  return theme ? `\x1B[${theme}[%s]\x1B[0m` : `%s`;
+  return theme ? `\x1B[${theme}m[%s]\x1B[0m` : `%s`;
 };
 var THEMES = {
   log: genTheme({ font: { colorType: "LIGHT", colorValue: "BLACK" } }),

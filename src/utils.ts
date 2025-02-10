@@ -66,7 +66,7 @@ const genTheme = ({ font, background}: ThemeProps) => {
         font ? COLORS.FOREGROUND[font.colorType][font.colorValue] : undefined,
         background ? COLORS.BACKGROUND[background.colorType][background.colorValue] : undefined
     ].filter(Boolean).join(';');
-    return theme ? `\x1b[${theme}[%s]\x1b[0m` : `%s`;
+    return theme ? `\x1b[${theme}m[%s]\x1b[0m` : `%s`;
 }
 
 const THEMES = {

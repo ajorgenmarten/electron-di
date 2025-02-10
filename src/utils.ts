@@ -52,25 +52,33 @@ const COLORS = {
 type ColorFor = keyof typeof COLORS;
 type ColorType = keyof typeof COLORS[ColorFor];
 type ColorValue = keyof typeof COLORS[ColorFor][ColorType];
+interface ThemeProps {
+    font?: { colorType: ColorType, colorValue: ColorValue },
+    background?: { colorType: ColorType, colorValue: ColorValue }
+}
+interface CustomLoggerProps {
+    title: ThemeProps
+    message: ThemeProps
+}
 
-const genTheme = (font?: { colorType: ColorType, colorValue: ColorValue }, background?: { colorType: ColorType, colorValue: ColorValue }) => {
+const genTheme = ({ font, background}: ThemeProps) => {
     const theme = [
         font ? COLORS.FOREGROUND[font.colorType][font.colorValue] : undefined,
         background ? COLORS.BACKGROUND[background.colorType][background.colorValue] : undefined
     ].filter(Boolean).join(';');
-    return theme ? `\x1b[${theme}]%s\x1b[0m` : `%s`;
+    return theme ? `\x1b[${theme}[%s]\x1b[0m` : `%s`;
 }
 
 const THEMES = {
-    log: genTheme({colorType: 'LIGHT', colorValue: 'BLACK' }),
-    success: genTheme({colorType: 'LIGHT', colorValue: 'GREEN' }),
-    error: genTheme({colorType: 'LIGHT', colorValue: 'RED' }),
-    info: genTheme({colorType: 'LIGHT', colorValue: 'BLUE' }),
-    warn: genTheme({colorType: 'LIGHT', colorValue: 'YELLOW' }),
+    log: genTheme({ font: {colorType: 'LIGHT', colorValue: 'BLACK' }}),
+    success: genTheme({ font: {colorType: 'LIGHT', colorValue: 'GREEN' }}),
+    error: genTheme({ font: {colorType: 'LIGHT', colorValue: 'RED' }}),
+    info: genTheme({ font: {colorType: 'LIGHT', colorValue: 'BLUE' }}),
+    warn: genTheme({ font: {colorType: 'LIGHT', colorValue: 'YELLOW' }}),
 }
 
 export class Logger {
-    static log(message: string, title?: string) {
+    static log(message: string, title: string = 'ELECTRON DI') {
         console.log(`${THEMES.log}:\t${message}`, title);
     }
     static info(message: string, title?: string) {
@@ -84,6 +92,13 @@ export class Logger {
     }
     static warn(message: string, title?: string) {
         console.log(`${THEMES.warn}:\t${message}`, title);
+    }
+    static customLogger(options: CustomLoggerProps) {
+        const titleTheme = genTheme(options.title);
+        const messageTheme = genTheme(options.message);
+        return function (message: string, title?: string, ...args: any[]) {
+            console.log(`${titleTheme}:\t${messageTheme}`, message, title, ...args);
+        }
     }
 }
 

@@ -92,22 +92,22 @@ var COLORS = {
     }
   }
 };
-var genTheme = (font, background) => {
+var genTheme = ({ font, background }) => {
   const theme = [
     font ? COLORS.FOREGROUND[font.colorType][font.colorValue] : void 0,
     background ? COLORS.BACKGROUND[background.colorType][background.colorValue] : void 0
   ].filter(Boolean).join(";");
-  return theme ? `\x1B[${theme}]%s\x1B[0m` : `%s`;
+  return theme ? `\x1B[${theme}[%s]\x1B[0m` : `%s`;
 };
 var THEMES = {
-  log: genTheme({ colorType: "LIGHT", colorValue: "BLACK" }),
-  success: genTheme({ colorType: "LIGHT", colorValue: "GREEN" }),
-  error: genTheme({ colorType: "LIGHT", colorValue: "RED" }),
-  info: genTheme({ colorType: "LIGHT", colorValue: "BLUE" }),
-  warn: genTheme({ colorType: "LIGHT", colorValue: "YELLOW" })
+  log: genTheme({ font: { colorType: "LIGHT", colorValue: "BLACK" } }),
+  success: genTheme({ font: { colorType: "LIGHT", colorValue: "GREEN" } }),
+  error: genTheme({ font: { colorType: "LIGHT", colorValue: "RED" } }),
+  info: genTheme({ font: { colorType: "LIGHT", colorValue: "BLUE" } }),
+  warn: genTheme({ font: { colorType: "LIGHT", colorValue: "YELLOW" } })
 };
 var Logger = class {
-  static log(message, title) {
+  static log(message, title = "ELECTRON DI") {
     console.log(`${THEMES.log}:	${message}`, title);
   }
   static info(message, title) {
@@ -121,6 +121,13 @@ var Logger = class {
   }
   static warn(message, title) {
     console.log(`${THEMES.warn}:	${message}`, title);
+  }
+  static customLogger(options) {
+    const titleTheme = genTheme(options.title);
+    const messageTheme = genTheme(options.message);
+    return function(message, title, ...args) {
+      console.log(`${titleTheme}:	${messageTheme}`, message, title, ...args);
+    };
   }
 };
 var ElectronDIError = class extends Error {

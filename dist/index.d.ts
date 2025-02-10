@@ -208,12 +208,80 @@ declare function Module(options: IModuleOptions): (target: IClass) => void;
  */
 declare function Bootstrap(...modules: IClass[]): void;
 
+declare const COLORS: {
+    BACKGROUND: {
+        LIGHT: {
+            BLACK: string;
+            RED: string;
+            GREEN: string;
+            YELLOW: string;
+            BLUE: string;
+            MAGENTA: string;
+            CYAN: string;
+            WHITE: string;
+            DEFAULT: string;
+        };
+        DARK: {
+            BLACK: string;
+            RED: string;
+            GREEN: string;
+            YELLOW: string;
+            BLUE: string;
+            MAGENTA: string;
+            CYAN: string;
+            WHITE: string;
+            DEFAULT: string;
+        };
+    };
+    FOREGROUND: {
+        LIGHT: {
+            BLACK: string;
+            RED: string;
+            GREEN: string;
+            YELLOW: string;
+            BLUE: string;
+            MAGENTA: string;
+            CYAN: string;
+            WHITE: string;
+            DEFAULT: string;
+        };
+        DARK: {
+            BLACK: string;
+            RED: string;
+            GREEN: string;
+            YELLOW: string;
+            BLUE: string;
+            MAGENTA: string;
+            CYAN: string;
+            WHITE: string;
+            DEFAULT: string;
+        };
+    };
+};
+type ColorFor = keyof typeof COLORS;
+type ColorType = keyof typeof COLORS[ColorFor];
+type ColorValue = keyof typeof COLORS[ColorFor][ColorType];
+interface ThemeProps {
+    font?: {
+        colorType: ColorType;
+        colorValue: ColorValue;
+    };
+    background?: {
+        colorType: ColorType;
+        colorValue: ColorValue;
+    };
+}
+interface CustomLoggerProps {
+    title: ThemeProps;
+    message: ThemeProps;
+}
 declare class Logger {
     static log(message: string, title?: string): void;
     static info(message: string, title?: string): void;
     static success(message: string, title?: string): void;
     static error(message: string, title?: string): void;
     static warn(message: string, title?: string): void;
+    static customLogger(options: CustomLoggerProps): (message: string, title?: string, ...args: any[]) => void;
 }
 
 export { Bootstrap, CanActivate, Controller, Inject, Injectable, Logger, Middleware, Module, OnInvoke, OnSend, container };

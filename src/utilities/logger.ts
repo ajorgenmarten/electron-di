@@ -78,32 +78,26 @@ const THEMES = {
 }
 
 export class Logger {
-    static log(message: string, title: string = 'ELECTRON DI') {
-        console.log(`${THEMES.log}:\t${message}`, title);
+    static log(message: string, title: string = 'ELECTRON DI', ...args: any[]) {
+        console.log(`${THEMES.log}:\t${message}`, title, ...args);
     }
-    static info(message: string, title?: string) {
-        console.log(`${THEMES.info}:\t${message}`, title);
+    static info(message: string, title: string = 'ELECTRON DI', ...args: any[]) {
+        console.log(`${THEMES.info}:\t${message}`, title, ...args);
     }
-    static success(message: string, title?: string) {
-        console.log(`${THEMES.success}:\t${message}`, title);
+    static success(message: string, title: string = 'ELECTRON DI', ...args: any[]) {
+        console.log(`${THEMES.success}:\t${message}`, title, ...args);
     }
-    static error(message: string, title?: string) {
-        console.log(`${THEMES.error}:\t${message}`, title);
+    static error(message: string, title: string = 'ELECTRON DI', ...args: any[]) {
+        console.log(`${THEMES.error}:\t${message}`, title, ...args);
     }
-    static warn(message: string, title?: string) {
-        console.log(`${THEMES.warn}:\t${message}`, title);
+    static warn(message: string, title: string = 'ELECTRON DI', ...args: any[]) {
+        console.log(`${THEMES.warn}:\t${message}`, title, ...args);
     }
     static customLogger(options: CustomLoggerProps) {
         const titleTheme = genTheme(options.title);
         const messageTheme = genTheme(options.message);
-        return function (message: string, title?: string, ...args: any[]) {
-            console.log(`${titleTheme}:\t${messageTheme}`, message, title, ...args);
+        return function (message: string, title: string = 'LOGGER', ...args: any[]) {
+            console.log(`${titleTheme}:\t${messageTheme}`, title, message, ...args);
         }
-    }
-}
-
-export class ElectronDIError extends Error {
-    constructor(message: string) {
-        super(`[ELECTRON DI]: \t ${message}`)
     }
 }

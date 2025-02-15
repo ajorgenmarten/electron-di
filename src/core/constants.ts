@@ -1,0 +1,27 @@
+// SYMBOL METADATA FOR CLASSES
+const INJECTION_MODULE_SYMBOL = Symbol('metadata:module');
+const INJECTION_GLOBAL_SYMBOL = Symbol('metadata:global');
+const INJECTION_PROVIDER_SYMBOL = Symbol('metadata:provider');
+const INJECTION_CONTROLLER_SYMBOL = Symbol('metadata:controller');
+// SYMBOL METADATA FOR CLASSES AND METHODS
+const INJECTION_BEFORE_SYMBOL = Symbol('metadata:before');
+const INJECTION_AFTER_SYMBOL = Symbol('metadata:after');
+// SYMBOL METADATA FOR METHODS
+const INJECTION_IPCMETHOD_SYMBOL = Symbol('metadata:ipc');
+// SYMBOL METADATA FOR ARGUMENTS
+const INJECTION_INJECT_SYMBOL = Symbol('metadata:inject');
+const INJECTION_CONTROLLER_METHOD_ARGS_SYMBOL = Symbol('metadata:methodargs');
+
+export default {
+    Module: INJECTION_MODULE_SYMBOL,
+    Global: INJECTION_GLOBAL_SYMBOL,
+    Provider: INJECTION_PROVIDER_SYMBOL,
+    Controller: INJECTION_CONTROLLER_SYMBOL,
+
+    Before: INJECTION_BEFORE_SYMBOL,
+    After: INJECTION_AFTER_SYMBOL,
+
+    IPCMethod: INJECTION_IPCMETHOD_SYMBOL,
+    Inject: INJECTION_INJECT_SYMBOL,
+    ControllerMethodArgs: INJECTION_CONTROLLER_METHOD_ARGS_SYMBOL
+}

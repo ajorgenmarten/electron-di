@@ -42,7 +42,6 @@
   },
   "peerDependencies": {
     "electron": ">=30.0.2 <32.0.0",
-    "electron-vite": "^2.0.0",
     "reflect-metadata": "^0.2.2"
   }
 }

@@ -1,27 +1,27 @@
-// SYMBOL METADATA FOR CLASSES
-const INJECTION_MODULE_SYMBOL = Symbol('metadata:module');
-const INJECTION_GLOBAL_SYMBOL = Symbol('metadata:global');
-const INJECTION_PROVIDER_SYMBOL = Symbol('metadata:provider');
-const INJECTION_CONTROLLER_SYMBOL = Symbol('metadata:controller');
-// SYMBOL METADATA FOR CLASSES AND METHODS
-const INJECTION_BEFORE_SYMBOL = Symbol('metadata:before');
-const INJECTION_AFTER_SYMBOL = Symbol('metadata:after');
-// SYMBOL METADATA FOR METHODS
-const INJECTION_IPCMETHOD_SYMBOL = Symbol('metadata:ipc');
-// SYMBOL METADATA FOR ARGUMENTS
-const INJECTION_INJECT_SYMBOL = Symbol('metadata:inject');
-const INJECTION_CONTROLLER_METHOD_ARGS_SYMBOL = Symbol('metadata:methodargs');
+const injectable = Symbol("electron-di:injectable");
+const controller = Symbol("electron-di:controller");
+const contextmodule = Symbol("electron-di:module");
+const global = Symbol("electron-di:global");
+const ipcmethod = Symbol("electron-di:ipc-method");
+const inject = Symbol("electron-di:inject");
+const paramsArg = Symbol("electron-di:params-args");
+const middlewares = Symbol("electron-di:middlewares");
 
-export default {
-    Module: INJECTION_MODULE_SYMBOL,
-    Global: INJECTION_GLOBAL_SYMBOL,
-    Provider: INJECTION_PROVIDER_SYMBOL,
-    Controller: INJECTION_CONTROLLER_SYMBOL,
+const INJECTION_SYMBOLS = {
+  global,
+  injectable,
+  controller,
+  module: contextmodule,
+  inject,
+  before: middlewares,
+  after: middlewares,
+  onsend: ipcmethod,
+  oninvoke: ipcmethod,
+  body: paramsArg,
+  headers: paramsArg,
+  request: paramsArg,
+  event: paramsArg,
+  response: paramsArg,
+};
 
-    Before: INJECTION_BEFORE_SYMBOL,
-    After: INJECTION_AFTER_SYMBOL,
-
-    IPCMethod: INJECTION_IPCMETHOD_SYMBOL,
-    Inject: INJECTION_INJECT_SYMBOL,
-    ControllerMethodArgs: INJECTION_CONTROLLER_METHOD_ARGS_SYMBOL
-}
+export default INJECTION_SYMBOLS;

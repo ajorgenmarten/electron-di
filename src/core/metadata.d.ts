@@ -1,24 +1,47 @@
-import { ModuleOptions } from "./types";
+import { Class, Token } from "./types";
 
-export type InjectableMetadata = boolean
-export type GlobalMetadata = boolean
+export type Provider = { provide: Token; useClass: Class } | Class;
+export type ParamsDecorator =
+  | "IpcEvent"
+  | "Body"
+  | "Headers"
+  | "Request"
+  | "Response";
+export interface ItemParamMetadata {
+  type: ParamsDecorator;
+  key?: string;
+}
+
+export interface ModuleOptions {
+  providers?: Provider[];
+  controllers?: Class[];
+  imports?: Class;
+  exports?: Token;
+}
+export interface ItemMiddlewareMetadata {
+  type: "After" | "Before";
+  method?: string;
+  token: Token;
+}
+
+export type InjectableMetadata = boolean;
+export type GlobalMetadata = boolean;
 export interface ControllerMetadata {
-    prefix?: string;
-    isInjectable: boolean;
+  prefix?: string;
 }
 export interface ModuleMetadata {
-    options: ModuleOptions;
+  options: ModuleOptions;
 }
-export interface IPCMetadata {
-    ipcmethod: "send" | "invoke";
-    path: string;
+export interface IPCMethodMetadata {
+  type: "send" | "invoke";
+  channel: string;
 }
-export interface InjectConstructorMetadata {
-    tokens: Token[];
+export interface InjectMetadata {
+  constructorArgs: Token[];
 }
-interface MethodArg {
-    type: "body" | "headers" | "event" | "request";
+export interface ParamsMetadata {
+  params: ItemParamMetadata[];
 }
-export interface InjectMethodArg {
-    args: MethodArg[];
+export interface MiddlewareMetadata {
+  middlewares: ItemMiddlewareMetadata[];
 }

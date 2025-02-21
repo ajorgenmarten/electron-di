@@ -9,3 +9,6 @@ export * from "./Body";
 export * from "./Headers";
 export * from "./IPCEvent";
 export * from "./Request";
+export * from "./Inject";
+export * from "./OnSend";
+export * from "./OnInvoke";

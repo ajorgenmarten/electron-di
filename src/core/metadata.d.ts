@@ -15,13 +15,17 @@ export interface ItemParamMetadata {
 export interface ModuleOptions {
   providers?: Provider[];
   controllers?: Class[];
-  imports?: Class;
-  exports?: Token;
+  imports?: Class[];
+  exports?: Token[];
 }
 export interface ItemMiddlewareMetadata {
   type: "After" | "Before";
   method?: string;
   token: Token;
+}
+export interface ItemIPCMethodMetadata {
+  type: "send" | "invoke";
+  channel: string;
 }
 
 export type InjectableMetadata = boolean;
@@ -33,8 +37,7 @@ export interface ModuleMetadata {
   options: ModuleOptions;
 }
 export interface IPCMethodMetadata {
-  type: "send" | "invoke";
-  channel: string;
+  methods: ItemIPCMethodMetadata[];
 }
 export interface InjectMetadata {
   constructorArgs: Token[];

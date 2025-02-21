@@ -75,7 +75,7 @@ declare class Logger {
 }
 
 type Class = new (...args: any[]) => any;
-type AbstractClass = new (...args: any[]) => any;
+type AbstractClass = abstract new (...args: any[]) => any;
 type Token = Class | AbstractClass;
 
 declare function After(token: Token): (target: any, propertyKey?: string | undefined, _propertyDescriptor?: PropertyDescriptor) => void;
@@ -95,8 +95,8 @@ type Provider = { provide: Token; useClass: Class } | Class;
 interface ModuleOptions {
   providers?: Provider[];
   controllers?: Class[];
-  imports?: Class;
-  exports?: Token;
+  imports?: Class[];
+  exports?: Token[];
 }
 
 declare function Module(options: ModuleOptions): (target: Class) => void;
@@ -107,6 +107,12 @@ declare function IPCEvent(key?: string): (target: any, propertyKey: string, para
 
 declare function Request(key?: string): (target: any, propertyKey: string, paramIndex: number) => void;
 
+declare function Inject(token: Token): (target: any, propertyKey: string | undefined, paramIndex: number) => void;
+
+declare function OnSend(channel: string): (target: any, propertyKey: string, descriptor: PropertyDescriptor) => void;
+
+declare function OnInvoke(channel: string): (target: any, propertyKey: string, descriptor: PropertyDescriptor) => void;
+
 declare function Bootstrap(module: Class): void;
 
-export { After, Before, Body, Bootstrap, Controller, Global, Headers, IPCEvent, Injectable, Logger, Module, Request };
+export { After, Before, Body, Bootstrap, Controller, Global, Headers, IPCEvent, Inject, Injectable, Logger, Module, OnInvoke, OnSend, Request };

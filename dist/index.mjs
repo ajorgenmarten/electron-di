@@ -223,7 +223,7 @@ function Injectable() {
 function Module(options) {
   return function(target) {
     HaveNotBeenApplied(target, ["controller", "injectable"]);
-    const metadata = true;
+    const metadata = { options };
     Reflect.defineMetadata(constants_default.module, metadata, target);
   };
 }
@@ -280,10 +280,188 @@ function Request(key) {
   };
 }
 
+// src/decorators/Inject.ts
+function Inject(token) {
+  return function(target, propertyKey, paramIndex) {
+    var _a;
+    const metadata = (_a = Reflect.getMetadata(
+      constants_default.inject,
+      target
+    )) != null ? _a : { constructorArgs: [] };
+    metadata.constructorArgs[paramIndex] = token;
+    Reflect.defineMetadata(constants_default.inject, metadata, target);
+  };
+}
+
+// src/decorators/OnSend.ts
+function OnSend(channel) {
+  return function(target, propertyKey, descriptor) {
+    var _a;
+    const metadata = (_a = Reflect.getMetadata(
+      constants_default.onsend,
+      target,
+      propertyKey
+    )) != null ? _a : { methods: [] };
+    const metadataItem = {
+      type: "send",
+      channel
+    };
+    metadata.methods.push(metadataItem);
+    Reflect.defineMetadata(constants_default.onsend, metadata, target, propertyKey);
+  };
+}
+
+// src/decorators/OnInvoke.ts
+function OnInvoke(channel) {
+  return function(target, propertyKey, descriptor) {
+    var _a;
+    const metadata = (_a = Reflect.getMetadata(
+      constants_default.onsend,
+      target,
+      propertyKey
+    )) != null ? _a : { methods: [] };
+    const metadataItem = {
+      type: "invoke",
+      channel
+    };
+    metadata.methods.push(metadataItem);
+    Reflect.defineMetadata(constants_default.onsend, metadata, target, propertyKey);
+  };
+}
+
+// src/core/container.ts
+var Module2 = class {
+  constructor(name, options, linkResolveForModule, linkResolveForGlobal) {
+    this.name = name;
+    this.options = options;
+    this.linkResolveForModule = linkResolveForModule;
+    this.linkResolveForGlobal = linkResolveForGlobal;
+    this.instances = /* @__PURE__ */ new Map();
+  }
+  get Name() {
+    return this.name;
+  }
+  get Controllers() {
+    return this.options.controllers;
+  }
+  resolveGlobal(token) {
+    const instance = this.linkResolveForGlobal(token);
+    return instance;
+  }
+  resolveExternal(token) {
+    if (typeof this.options.imports === "undefined") return null;
+    for (const module of this.options.imports) {
+      const instance = this.linkResolveForModule(module.name, token);
+      if (!instance) continue;
+      return instance;
+    }
+    return null;
+  }
+  resolve(token) {
+    if (this.instances.has(token)) return this.instances.get(token);
+    if (typeof this.options.providers === "undefined") {
+      let instance = this.resolveExternal(token);
+      if (instance) return instance;
+      instance = this.resolveGlobal(token);
+      if (instance) return instance;
+    } else
+      for (const provider of this.options.providers) {
+        const [provided, useClass] = typeof provider === "function" ? [provider, provider] : [provider.provide, provider.useClass];
+        if (provided !== token) continue;
+        const injectMetadata = Reflect.getMetadata(
+          constants_default.inject,
+          useClass
+        );
+        let instance = null;
+        if (typeof injectMetadata === "undefined") {
+          instance = new useClass();
+          this.instances.set(provided, instance);
+        } else {
+          const instances = injectMetadata.constructorArgs.map(
+            (injectToken) => {
+              this.resolve(injectToken);
+            }
+          );
+          instance = new useClass(...instances);
+          this.instances.set(provided, instance);
+        }
+        return instance;
+      }
+    throw new Error(
+      `No se ha encontrado el proveedor ${token.name} en el m\xF3dulo ${this.name}`
+    );
+  }
+};
+var Container = class {
+  constructor() {
+    this.modules = /* @__PURE__ */ new Map();
+    this.globalModules = [];
+  }
+  registerTreeModule(module) {
+    HaveBeenApplied(module, ["module"]);
+    const { options } = Reflect.getMetadata(
+      constants_default.module,
+      module
+    );
+    const name = module.name;
+    const ModuleClass = new Module2(
+      name,
+      options,
+      this.resolve.bind(this),
+      this.resolveGlobal.bind(this)
+    );
+    if (typeof options.imports !== "undefined") {
+      for (const optionModule of options.imports) {
+        this.registerTreeModule(optionModule);
+      }
+    }
+    this.modules.set(name, ModuleClass);
+    const isGlobal = Reflect.getMetadata(constants_default.global, module);
+    if (isGlobal === true) this.globalModules.push(name);
+  }
+  resolve(module, token) {
+    const ModuleClass = this.modules.get(module);
+    if (!ModuleClass)
+      throw new Error(`No se ha encontrado el m\xF3dulo ${module}`);
+    return ModuleClass.resolve(token);
+  }
+  resolveGlobal(token) {
+    for (const module of this.globalModules) {
+      const ModuleClass = this.modules.get(module);
+      const instance = ModuleClass == null ? void 0 : ModuleClass.resolve(token);
+      if (instance) return instance;
+    }
+    return null;
+  }
+  upControllers() {
+    var _a;
+    for (const module of this.modules.values()) {
+      if (typeof module.Controllers === "undefined") continue;
+      console.log("module.Controllers: ", module);
+      for (const controller2 of module.Controllers) {
+        const controllerMetadata = Reflect.getMetadata(
+          constants_default.controller,
+          controller2
+        );
+        const injectMetadata = (_a = Reflect.getMetadata(
+          constants_default.inject,
+          controller2
+        )) != null ? _a : { constructorArgs: [] };
+        const argsInstances = injectMetadata.constructorArgs.map(
+          (token) => module.resolve(token)
+        );
+        const controllerInstance = new controller2(...argsInstances);
+        console.log("\ncontrollerInstance: ", controllerInstance);
+      }
+    }
+  }
+};
+
 // src/core/bootstrap.ts
 function Bootstrap(module) {
-  const metadata = Reflect.getMetadata(constants_default.module, module);
-  console.log(metadata);
+  const container = new Container();
+  container.registerTreeModule(module);
+  container.upControllers();
 }
 export {
   After,
@@ -294,9 +472,12 @@ export {
   Global,
   Headers,
   IPCEvent,
+  Inject,
   Injectable,
   Logger,
   Module,
+  OnInvoke,
+  OnSend,
   Request
 };
 //# sourceMappingURL=index.mjs.map

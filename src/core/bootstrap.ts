@@ -1,7 +1,9 @@
 import { Class } from "./types";
 import symbols from "./constants";
+import { Container } from "./container";
 
 export function Bootstrap(module: Class) {
-  const metadata = Reflect.getMetadata(symbols.module, module);
-  console.log(metadata);
+  const container = new Container();
+  container.registerTreeModule(module);
+  container.upControllers();
 }

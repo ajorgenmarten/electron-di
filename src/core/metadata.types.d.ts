@@ -1,6 +1,6 @@
-import { Class, Token } from "./types";
+import { Class, Token } from "./general.types";
 
-export type Provider = { provide: Token; useClass: Class } | Class;
+export type IProvider = { provide: Token; useClass: Class } | Class;
 export type ParamsDecorator =
   | "IpcEvent"
   | "Body"
@@ -13,7 +13,7 @@ export interface ItemParamMetadata {
 }
 
 export interface ModuleOptions {
-  providers?: Provider[];
+  providers?: IProvider[];
   controllers?: Class[];
   imports?: Class[];
   exports?: Token[];

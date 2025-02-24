@@ -1,5 +1,5 @@
 import symbols from "@core/constants";
-import { IPCMethodMetadata, ItemIPCMethodMetadata } from "@core/metadata";
+import { IPCMethodMetadata, ItemIPCMethodMetadata } from "@core/metadata.types";
 
 export function OnSend(channel: string) {
   return function (

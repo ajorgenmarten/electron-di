@@ -4,12 +4,11 @@ import {
   InjectableMetadata,
   ModuleMetadata,
   ModuleOptions,
-} from "@core/metadata";
-import { Class } from "@core/types";
+} from "@core/metadata.types";
+import { Class } from "@core/general.types";
 
 export function Module(options: ModuleOptions) {
   return function (target: Class) {
-    HaveNotBeenApplied(target, ["controller", "injectable"]);
     const metadata: ModuleMetadata = { options };
     Reflect.defineMetadata(symbols.module, metadata, target);
   };

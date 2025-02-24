@@ -1,5 +1,5 @@
 import { HaveBeenApplied, HaveNotBeenApplied } from "@core/ensurances";
-import { ParamsMetadata } from "@core/metadata";
+import { ParamsMetadata } from "@core/metadata.types";
 import symbols from "@core/constants";
 
 export function Headers(key?: string) {

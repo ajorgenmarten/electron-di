@@ -74,9 +74,9 @@ declare class Logger {
     static customLogger(options: CustomLoggerProps): (message: string, title?: string, ...args: any[]) => void;
 }
 
-type Class = new (...args: any[]) => any;
-type AbstractClass = abstract new (...args: any[]) => any;
-type Token = Class | AbstractClass;
+type Class<T = any> = new (...args: any[]) => T;
+type AbstractClass<T = any> = abstract new (...args: any[]) => T;
+type Token<T = any> = Class<T> | AbstractClass<T>;
 
 declare function After(token: Token): (target: any, propertyKey?: string | undefined, _propertyDescriptor?: PropertyDescriptor) => void;
 
@@ -90,10 +90,10 @@ declare function Global(): (target: Class) => void;
 
 declare function Injectable(): (target: Class) => void;
 
-type Provider = { provide: Token; useClass: Class } | Class;
+type IProvider = { provide: Token; useClass: Class } | Class;
 
 interface ModuleOptions {
-  providers?: Provider[];
+  providers?: IProvider[];
   controllers?: Class[];
   imports?: Class[];
   exports?: Token[];

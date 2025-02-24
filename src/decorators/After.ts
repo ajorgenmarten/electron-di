@@ -1,7 +1,10 @@
 import { HaveBeenApplied, HaveNotBeenApplied } from "@core/ensurances";
 import symbols from "@core/constants";
-import { ItemMiddlewareMetadata, MiddlewareMetadata } from "@core/metadata";
-import { Token } from "@core/types";
+import {
+  ItemMiddlewareMetadata,
+  MiddlewareMetadata,
+} from "@core/metadata.types";
+import { Token } from "@core/general.types";
 
 export function After(token: Token) {
   return function (

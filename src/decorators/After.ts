@@ -1,4 +1,3 @@
-import { HaveBeenApplied, HaveNotBeenApplied } from "@core/ensurances";
 import symbols from "@core/constants";
 import {
   ItemMiddlewareMetadata,
@@ -15,16 +14,29 @@ export function After(token: Token) {
     const level = typeof propertyKey === "undefined" ? "class" : "method";
     const method = level == "class" ? undefined : propertyKey;
     const type = "After";
-    const targetDefinition = level == "class" ? target : target.prototype;
-    HaveBeenApplied(targetDefinition, ["controller"]);
-    HaveNotBeenApplied(targetDefinition, ["injectable", "module"]);
-    let metadata: MiddlewareMetadata = Reflect.getMetadata(
-      symbols.after,
-      targetDefinition
-    );
+    let metadata: MiddlewareMetadata;
+    if (level === "class") {
+      metadata = Reflect.getMetadata(symbols.middlewares, target) ?? {
+        middlewares: [],
+      };
+    } else {
+      metadata = Reflect.getMetadata(
+        symbols.middlewares,
+        target,
+        propertyKey as string
+      ) ?? { middlewares: [] };
+    }
     const itemMetadata: ItemMiddlewareMetadata = { type, token, method };
-    if (typeof metadata === "undefined") metadata = { middlewares: [] };
     metadata.middlewares.push(itemMetadata);
-    Reflect.defineMetadata(symbols.after, metadata, targetDefinition);
+    if (level === "class") {
+      Reflect.defineMetadata(symbols.middlewares, metadata, target);
+    } else {
+      Reflect.defineMetadata(
+        symbols.middlewares,
+        metadata,
+        target,
+        propertyKey as string
+      );
+    }
   };
 }

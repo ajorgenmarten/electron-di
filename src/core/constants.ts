@@ -1,6 +1,6 @@
 const injectable = Symbol("electron-di:injectable");
 const controller = Symbol("electron-di:controller");
-const contextmodule = Symbol("electron-di:module");
+const module = Symbol("electron-di:module");
 const global = Symbol("electron-di:global");
 const ipcmethod = Symbol("electron-di:ipc-method");
 const inject = Symbol("electron-di:inject");
@@ -11,17 +11,11 @@ const INJECTION_SYMBOLS = {
   global,
   injectable,
   controller,
-  module: contextmodule,
+  module,
   inject,
-  before: middlewares,
-  after: middlewares,
-  onsend: ipcmethod,
-  oninvoke: ipcmethod,
-  body: paramsArg,
-  headers: paramsArg,
-  request: paramsArg,
-  event: paramsArg,
-  response: paramsArg,
+  middlewares,
+  ipcmethod,
+  paramsArg,
 };
 
 export default INJECTION_SYMBOLS;

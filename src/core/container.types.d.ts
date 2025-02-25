@@ -7,6 +7,12 @@ interface IComponent {
 
 interface IController extends IComponent {
   Prefix: string;
+  Middlewares: IMiddleware[];
+}
+
+interface IMiddleware {
+  Token: Token;
+  Type: "After" | "Before";
 }
 
 interface IModule {
@@ -33,4 +39,11 @@ interface ILinkObject {
   ): InstanceType<Token> | null;
 }
 
-export { IComponent, IController, IModule, IContainer, ILinkObject };
+export {
+  IComponent,
+  IMiddleware,
+  IController,
+  IModule,
+  IContainer,
+  ILinkObject,
+};

@@ -1,7 +1,9 @@
 import {
   IComponent,
   IContainer,
+  IController,
   ILinkObject,
+  IMiddleware,
   IModule,
 } from "./container.types";
 import {
@@ -10,6 +12,8 @@ import {
   InjectableMetadata,
   InjectMetadata,
   IProvider,
+  ItemMiddlewareMetadata,
+  MiddlewareMetadata,
   ModuleMetadata,
 } from "./metadata.types";
 import { Class, Token } from "./general.types";
@@ -46,8 +50,22 @@ class Provider extends Component {
   }
 }
 
-class Controller extends Component {
+class Middleware implements IMiddleware {
+  constructor(
+    private token: Token,
+    private type: ItemMiddlewareMetadata["type"]
+  ) {}
+  get Type() {
+    return this.type;
+  }
+  get Token() {
+    return this.token;
+  }
+}
+
+class Controller extends Component implements IController {
   private _prefix: string;
+  private _middlewares: Middleware[] = [];
   constructor(controllerClass: Class) {
     // VERIFICAR SI ESTA INYECTADA CON EL DECORADOR @Controller
     const controllerMetadata: ControllerMetadata = Reflect.getMetadata(
@@ -60,9 +78,24 @@ class Controller extends Component {
       );
     super(controllerClass, controllerClass);
     this._prefix = controllerMetadata.prefix ?? "";
+    // OBTENER MIDDLEWARES DE LA CLASE
+    const middlewareMetadata: MiddlewareMetadata = Reflect.getMetadata(
+      symbols.middlewares,
+      controllerClass
+    ) ?? { middlewares: [] };
+    for (const middlewareItem of middlewareMetadata.middlewares) {
+      const middleware = new Middleware(
+        middlewareItem.token,
+        middlewareItem.type
+      );
+      this._middlewares.push(middleware);
+    }
   }
   get Prefix() {
     return this._prefix;
+  }
+  get Middlewares() {
+    return this._middlewares;
   }
 }
 

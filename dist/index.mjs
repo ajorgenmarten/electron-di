@@ -1,3 +1,40 @@
+var __defProp = Object.defineProperty;
+var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __propIsEnum = Object.prototype.propertyIsEnumerable;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __spreadValues = (a, b) => {
+  for (var prop in b || (b = {}))
+    if (__hasOwnProp.call(b, prop))
+      __defNormalProp(a, prop, b[prop]);
+  if (__getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(b)) {
+      if (__propIsEnum.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    }
+  return a;
+};
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
+
 // src/index.ts
 import "reflect-metadata";
 
@@ -94,7 +131,7 @@ var Logger = class {
 // src/core/constants.ts
 var injectable = Symbol("electron-di:injectable");
 var controller = Symbol("electron-di:controller");
-var contextmodule = Symbol("electron-di:module");
+var module = Symbol("electron-di:module");
 var global = Symbol("electron-di:global");
 var ipcmethod = Symbol("electron-di:ipc-method");
 var inject = Symbol("electron-di:inject");
@@ -104,90 +141,93 @@ var INJECTION_SYMBOLS = {
   global,
   injectable,
   controller,
-  module: contextmodule,
+  module,
   inject,
-  before: middlewares,
-  after: middlewares,
-  onsend: ipcmethod,
-  oninvoke: ipcmethod,
-  body: paramsArg,
-  headers: paramsArg,
-  request: paramsArg,
-  event: paramsArg,
-  response: paramsArg
+  middlewares,
+  ipcmethod,
+  paramsArg
 };
 var constants_default = INJECTION_SYMBOLS;
-
-// src/core/ensurances.ts
-function HaveNotBeenApplied(target, decorators) {
-  for (const decorator of decorators) {
-    const metadata = Reflect.getMetadata(constants_default[decorator], target);
-    if (typeof metadata !== "undefined")
-      throw new Error(`Ha sido decorado con ${decorator}`);
-  }
-}
-function HaveBeenApplied(target, decorators) {
-  for (const decorator of decorators) {
-    const metadata = Reflect.getMetadata(constants_default[decorator], target);
-    if (typeof metadata === "undefined")
-      throw new Error(`No se ha aplicado el decorador ${decorator}`);
-  }
-}
 
 // src/decorators/After.ts
 function After(token) {
   return function(target, propertyKey, _propertyDescriptor) {
+    var _a, _b;
     const level = typeof propertyKey === "undefined" ? "class" : "method";
     const method = level == "class" ? void 0 : propertyKey;
     const type = "After";
-    const targetDefinition = level == "class" ? target : target.prototype;
-    HaveBeenApplied(targetDefinition, ["controller"]);
-    HaveNotBeenApplied(targetDefinition, ["injectable", "module"]);
-    let metadata = Reflect.getMetadata(
-      constants_default.after,
-      targetDefinition
-    );
+    let metadata;
+    if (level === "class") {
+      metadata = (_a = Reflect.getMetadata(constants_default.middlewares, target)) != null ? _a : {
+        middlewares: []
+      };
+    } else {
+      metadata = (_b = Reflect.getMetadata(
+        constants_default.middlewares,
+        target,
+        propertyKey
+      )) != null ? _b : { middlewares: [] };
+    }
     const itemMetadata = { type, token, method };
-    if (typeof metadata === "undefined") metadata = { middlewares: [] };
     metadata.middlewares.push(itemMetadata);
-    Reflect.defineMetadata(constants_default.after, metadata, targetDefinition);
+    if (level === "class") {
+      Reflect.defineMetadata(constants_default.middlewares, metadata, target);
+    } else {
+      Reflect.defineMetadata(
+        constants_default.middlewares,
+        metadata,
+        target,
+        propertyKey
+      );
+    }
   };
 }
 
 // src/decorators/Before.ts
 function Before(token) {
   return function(target, propertyKey, _propertyDescriptor) {
+    var _a, _b;
     const level = typeof propertyKey === "undefined" ? "class" : "method";
     const method = level == "class" ? void 0 : propertyKey;
     const type = "Before";
-    const targetDefinition = level == "class" ? target : target.prototype;
-    HaveBeenApplied(targetDefinition, ["controller"]);
-    HaveNotBeenApplied(targetDefinition, ["injectable", "module"]);
-    let metadata = Reflect.getMetadata(
-      constants_default.before,
-      targetDefinition
-    );
+    let metadata;
+    if (level === "class") {
+      metadata = (_a = Reflect.getMetadata(constants_default.middlewares, target)) != null ? _a : {
+        middlewares: []
+      };
+    } else {
+      metadata = (_b = Reflect.getMetadata(
+        constants_default.middlewares,
+        target,
+        propertyKey
+      )) != null ? _b : { middlewares: [] };
+    }
     const itemMetadata = { type, token, method };
-    if (typeof metadata === "undefined") metadata = { middlewares: [] };
     metadata.middlewares.push(itemMetadata);
-    Reflect.defineMetadata(constants_default.before, metadata, targetDefinition);
+    if (level === "class") {
+      Reflect.defineMetadata(constants_default.middlewares, metadata, target);
+    } else {
+      Reflect.defineMetadata(
+        constants_default.middlewares,
+        metadata,
+        target,
+        propertyKey
+      );
+    }
   };
 }
 
-// src/decorators/Body.ts
-function Body(key) {
+// src/decorators/Payload.ts
+function Payload(key) {
   return function(target, propertyKey, paramIndex) {
-    const targetDefinition = target.prototype;
-    HaveNotBeenApplied(targetDefinition, ["injectable", "module"]);
-    HaveBeenApplied(targetDefinition, ["controller"]);
-    let metadata = Reflect.getMetadata(
-      constants_default.body,
+    var _a;
+    const metadata = (_a = Reflect.getMetadata(
+      constants_default.paramsArg,
       target,
       propertyKey
-    );
-    if (typeof metadata === "undefined") metadata = { params: [] };
-    metadata.params[paramIndex] = { type: "Body", key };
-    Reflect.defineMetadata(constants_default.body, metadata, target, propertyKey);
+    )) != null ? _a : { params: [] };
+    metadata.params[paramIndex] = { type: "Payload", key };
+    Reflect.defineMetadata(constants_default.paramsArg, metadata, target, propertyKey);
   };
 }
 
@@ -207,71 +247,17 @@ function Global() {
   };
 }
 
-// src/decorators/Injectable.ts
-function Injectable() {
-  return function(target) {
-    const metadata = true;
-    Reflect.defineMetadata(constants_default.injectable, metadata, target);
-  };
-}
-
-// src/decorators/Module.ts
-function Module(options) {
-  return function(target) {
-    const metadata = { options };
-    Reflect.defineMetadata(constants_default.module, metadata, target);
-  };
-}
-
 // src/decorators/Headers.ts
 function Headers(key) {
   return function(target, propertyKey, paramIndex) {
-    const targetDefinition = target.prototype;
-    HaveNotBeenApplied(targetDefinition, ["injectable", "module"]);
-    HaveBeenApplied(targetDefinition, ["controller"]);
-    let metadata = Reflect.getMetadata(
-      constants_default.headers,
+    var _a;
+    const metadata = (_a = Reflect.getMetadata(
+      constants_default.paramsArg,
       target,
       propertyKey
-    );
-    console.log(metadata);
-    if (typeof metadata === "undefined") metadata = { params: [] };
+    )) != null ? _a : { params: [] };
     metadata.params[paramIndex] = { type: "Headers", key };
-    Reflect.defineMetadata(constants_default.headers, metadata, target, propertyKey);
-  };
-}
-
-// src/decorators/IPCEvent.ts
-function IPCEvent(key) {
-  return function(target, propertyKey, paramIndex) {
-    const targetDefinition = target.prototype;
-    HaveNotBeenApplied(targetDefinition, ["injectable", "module"]);
-    HaveBeenApplied(targetDefinition, ["controller"]);
-    let metadata = Reflect.getMetadata(
-      constants_default.event,
-      target,
-      propertyKey
-    );
-    if (typeof metadata === "undefined") metadata = { params: [] };
-    metadata.params[paramIndex] = { type: "IpcEvent", key };
-    Reflect.defineMetadata(constants_default.event, metadata, target, propertyKey);
-  };
-}
-
-// src/decorators/Request.ts
-function Request(key) {
-  return function(target, propertyKey, paramIndex) {
-    const targetDefinition = target.prototype;
-    HaveNotBeenApplied(targetDefinition, ["injectable", "module"]);
-    HaveBeenApplied(targetDefinition, ["controller"]);
-    let metadata = Reflect.getMetadata(
-      constants_default.request,
-      target,
-      propertyKey
-    );
-    if (typeof metadata === "undefined") metadata = { params: [] };
-    metadata.params[paramIndex] = { type: "Request", key };
-    Reflect.defineMetadata(constants_default.request, metadata, target, propertyKey);
+    Reflect.defineMetadata(constants_default.paramsArg, metadata, target, propertyKey);
   };
 }
 
@@ -288,39 +274,69 @@ function Inject(token) {
   };
 }
 
-// src/decorators/OnSend.ts
-function OnSend(channel) {
-  return function(target, propertyKey, descriptor) {
+// src/decorators/Injectable.ts
+function Injectable() {
+  return function(target) {
+    const metadata = true;
+    Reflect.defineMetadata(constants_default.injectable, metadata, target);
+  };
+}
+
+// src/decorators/IPCEvent.ts
+function IPCEvent(key) {
+  return function(target, propertyKey, paramIndex) {
     var _a;
     const metadata = (_a = Reflect.getMetadata(
-      constants_default.onsend,
+      constants_default.paramsArg,
       target,
       propertyKey
-    )) != null ? _a : { methods: [] };
-    const metadataItem = {
-      type: "send",
-      channel
-    };
-    metadata.methods.push(metadataItem);
-    Reflect.defineMetadata(constants_default.onsend, metadata, target, propertyKey);
+    )) != null ? _a : { params: [] };
+    metadata.params[paramIndex] = { type: "IpcEvent", key };
+    Reflect.defineMetadata(constants_default.paramsArg, metadata, target, propertyKey);
+  };
+}
+
+// src/decorators/Module.ts
+function Module(options) {
+  return function(target) {
+    const metadata = { options };
+    Reflect.defineMetadata(constants_default.module, metadata, target);
   };
 }
 
 // src/decorators/OnInvoke.ts
 function OnInvoke(channel) {
   return function(target, propertyKey, descriptor) {
-    var _a;
-    const metadata = (_a = Reflect.getMetadata(
-      constants_default.onsend,
-      target,
-      propertyKey
-    )) != null ? _a : { methods: [] };
-    const metadataItem = {
+    const metadata = {
       type: "invoke",
       channel
     };
-    metadata.methods.push(metadataItem);
-    Reflect.defineMetadata(constants_default.onsend, metadata, target, propertyKey);
+    Reflect.defineMetadata(constants_default.ipcmethod, metadata, target, propertyKey);
+  };
+}
+
+// src/decorators/OnSend.ts
+function OnSend(channel) {
+  return function(target, propertyKey, descriptor) {
+    const metadata = {
+      type: "send",
+      channel
+    };
+    Reflect.defineMetadata(constants_default.ipcmethod, metadata, target, propertyKey);
+  };
+}
+
+// src/decorators/Request.ts
+function Request() {
+  return function(target, propertyKey, paramIndex) {
+    var _a;
+    const metadata = (_a = Reflect.getMetadata(
+      constants_default.paramsArg,
+      target,
+      propertyKey
+    )) != null ? _a : { params: [] };
+    metadata.params[paramIndex] = { type: "Request" };
+    Reflect.defineMetadata(constants_default.paramsArg, metadata, target, propertyKey);
   };
 }
 
@@ -349,9 +365,21 @@ var Provider = class extends Component {
     super(token, useClass);
   }
 };
+var Middleware = class {
+  constructor(token, type) {
+    this.token = token;
+    this.type = type;
+  }
+  get Type() {
+    return this.type;
+  }
+  get Token() {
+    return this.token;
+  }
+};
 var Controller2 = class extends Component {
   constructor(controllerClass) {
-    var _a;
+    var _a, _b;
     const controllerMetadata = Reflect.getMetadata(
       constants_default.controller,
       controllerClass
@@ -361,10 +389,25 @@ var Controller2 = class extends Component {
         `La clase ${controllerClass.name} no ha sido decorada con @Controller`
       );
     super(controllerClass, controllerClass);
+    this._middlewares = [];
     this._prefix = (_a = controllerMetadata.prefix) != null ? _a : "";
+    const middlewareMetadata = (_b = Reflect.getMetadata(
+      constants_default.middlewares,
+      controllerClass
+    )) != null ? _b : { middlewares: [] };
+    for (const middlewareItem of middlewareMetadata.middlewares) {
+      const middleware = new Middleware(
+        middlewareItem.token,
+        middlewareItem.type
+      );
+      this._middlewares.push(middleware);
+    }
   }
   get Prefix() {
     return this._prefix;
+  }
+  get Middlewares() {
+    return this._middlewares;
   }
 };
 var Module2 = class {
@@ -466,49 +509,49 @@ var Container = class {
    * Luego se registra cada token como identificador del cual el valor va a ser el o los modulos donde se encuentra el token
    * @param module Modulo del cual se va a cachear los tokens que son tanto los proveedores como los controladores
    */
-  cacheTokenPath(module) {
+  cacheTokenPath(module2) {
     var _a;
     const getTokens = (components) => {
       return components.map((component) => component.Token);
     };
     const tokens = [
-      getTokens(module.Controllers),
-      getTokens(module.Providers)
+      getTokens(module2.Controllers),
+      getTokens(module2.Providers)
     ].flat();
     for (const token of tokens) {
       const cached = (_a = this._cache.get(token)) != null ? _a : [];
-      if (cached.includes(module.Class)) continue;
-      cached.push(module.Class);
+      if (cached.includes(module2.Class)) continue;
+      cached.push(module2.Class);
       this._cache.set(token, cached);
     }
   }
   findInGlobalModules(token) {
     const cached = this._cache.get(token);
     if (!cached) return null;
-    const module = this._modules.filter((module2) => cached.includes(module2.Class)).shift();
-    if (!module) return null;
-    if (!module.IsGlobal) return null;
-    return module.resolve(token);
+    const module2 = this._modules.filter((module3) => cached.includes(module3.Class)).shift();
+    if (!module2) return null;
+    if (!module2.IsGlobal) return null;
+    return module2.resolve(token);
   }
   findInSharedModules(token, modules) {
     const cached = this._cache.get(token);
     if (!cached) return null;
     const filteredModule = cached.filter((moduleClass) => modules.includes(moduleClass)).map((moduleClass) => {
-      return this._modules.find((module) => module.Class === moduleClass);
-    }).filter((module) => module == null ? void 0 : module.Exports.includes(token)).shift();
+      return this._modules.find((module2) => module2.Class === moduleClass);
+    }).filter((module2) => module2 == null ? void 0 : module2.Exports.includes(token)).shift();
     if (!filteredModule) return null;
     return filteredModule.resolve(token);
   }
-  registerModule(module) {
+  registerModule(module2) {
     const exist = this._modules.find(
-      (moduleItem) => moduleItem.Class === module
+      (moduleItem) => moduleItem.Class === module2
     );
     if (exist) return;
     const linkObject = {
       findInGlobalModules: this.findInGlobalModules.bind(this),
       findInSharedModules: this.findInSharedModules.bind(this)
     };
-    const moduleClass = new Module2(module, linkObject);
+    const moduleClass = new Module2(module2, linkObject);
     for (const moduleImported of moduleClass.Imports) {
       this.registerModule(moduleImported);
     }
@@ -521,10 +564,10 @@ var Container = class {
       throw new Error(
         `No se ha encontrado ninguna instancia para ${token.name}`
       );
-    const module = this._modules.find(
-      (module2) => module2.Class === exist[0]
+    const module2 = this._modules.find(
+      (module3) => module3.Class === exist[0]
     );
-    return module.resolve(token);
+    return module2.resolve(token);
   }
   get Modules() {
     return this._modules;
@@ -532,21 +575,181 @@ var Container = class {
 };
 
 // src/core/bootstrap.ts
-function Bootstrap(module) {
+import { ipcMain } from "electron";
+
+// src/core/params.ts
+var Request2 = class {
+  constructor(argument) {
+    this.headers = {};
+    this.payload = void 0;
+    this.headers = this.validateHeaders(argument == null ? void 0 : argument.headers);
+    this.payload = argument == null ? void 0 : argument.payload;
+  }
+  validateHeaders(headers) {
+    if (typeof headers === "undefined") return {};
+    if (typeof headers !== "object")
+      throw new Error(
+        "Headers debe ser un objeto de tipo Record<string, string>"
+      );
+    const claves = Object.keys(headers);
+    for (const clave of claves) {
+      if (typeof clave !== "string" || typeof headers[clave] !== "string")
+        throw new Error(
+          "Headers debe ser un objeto de tipo Record<string, string>"
+        );
+    }
+    return headers;
+  }
+  toPlainObject() {
+    return {
+      headers: __spreadValues({}, this.headers),
+      payload: this.payload ? this.payload : void 0
+    };
+  }
+};
+var Response = class {
+  constructor() {
+    this.headers = {};
+    this.payload = void 0;
+  }
+  header(key, value) {
+    if (typeof value === "undefined") delete this.headers[key];
+    else this.headers[key] = value.toString();
+    return this;
+  }
+  send(payload) {
+    this.payload = payload;
+  }
+  get Payload() {
+    return this.payload;
+  }
+};
+
+// src/core/bootstrap.ts
+function getMethodsNamesOfInstance(instance) {
+  const prototype = Object.getPrototypeOf(instance);
+  const methods = Object.getOwnPropertyNames(prototype).filter((methodName) => {
+    return typeof prototype[methodName] === "function" && methodName !== "constructor";
+  });
+  return methods;
+}
+function groupBy(array, key, mapper) {
+  const resultRecord = {};
+  for (const item of array) {
+    const value = item[key];
+    if (value in resultRecord) {
+      resultRecord[value].push(
+        typeof mapper === "function" ? mapper(item) : item
+      );
+    } else {
+      resultRecord[value] = [
+        typeof mapper === "function" ? mapper(item) : item
+      ];
+    }
+  }
+  return resultRecord;
+}
+function Bootstrap(module2) {
+  var _a, _b;
   const container = new Container();
-  container.registerModule(module);
-  const controllers = container.Modules.map((module2) => module2.Controllers).flat().map((controller3) => container.resolve(controller3.Token));
-  const controller2 = controllers[1];
-  console.log(controller2.randomGreeting());
-  console.log(controller2.randomGreeting());
-  console.log(controller2.randomGreeting());
-  console.log(controller2.randomGreeting());
-  console.log(controller2.randomGreeting());
+  container.registerModule(module2);
+  const controllers = container.Modules.map((module3) => module3.Controllers).flat().map((controller2) => {
+    const controllerInstance = container.resolve(controller2.Token);
+    const controllerPrefix = controller2.Prefix.trim();
+    const controllerMiddlewares = controller2.Middlewares.map((middleware) => {
+      const middlewareInstance = container.resolve(middleware.Token);
+      const middlewareType = middleware.Type;
+      return { middlewareInstance, middlewareType };
+    });
+    return { controllerInstance, controllerMiddlewares, controllerPrefix };
+  });
+  for (const controller2 of controllers) {
+    const { controllerInstance, controllerPrefix, controllerMiddlewares } = controller2;
+    const methods = getMethodsNamesOfInstance(controllerInstance);
+    for (const method of methods) {
+      const ipcMethodMetadata = Reflect.getMetadata(
+        constants_default.ipcmethod,
+        controllerInstance,
+        method
+      );
+      const paramsArgsMetadata = (_a = Reflect.getMetadata(
+        constants_default.paramsArg,
+        controllerInstance,
+        method
+      )) != null ? _a : { params: [] };
+      const middlewareMethods = (_b = Reflect.getMetadata(
+        constants_default.middlewares,
+        controllerInstance,
+        method
+      )) != null ? _b : { middlewares: [] };
+      if (!ipcMethodMetadata) continue;
+      const methodChannel = ipcMethodMetadata.channel.trim();
+      const channel = controllerPrefix ? `${controllerPrefix}:${methodChannel}` : methodChannel;
+      const listener = (event, ...args) => __async(this, null, function* () {
+        var _a2, _b2, _c, _d, _e;
+        const request = new Request2(args[0]).toPlainObject();
+        const resposne = new Response();
+        const resolveParams = (param) => {
+          if (param.type === "IpcEvent") {
+            return event;
+          }
+          if (param.type === "Request") {
+            return request;
+          }
+          if (param.type === "Headers") {
+            return request.headers;
+          }
+          if (param.type === "Payload") {
+            return request.payload;
+          }
+          if (param.type === "Response") {
+            return resposne;
+          }
+          return void 0;
+        };
+        const methodParams = paramsArgsMetadata.params.map(resolveParams);
+        const classMiddlewares = groupBy(
+          controllerMiddlewares,
+          "middlewareType",
+          (middleware) => middleware.middlewareInstance
+        );
+        const methodMiddlewares = groupBy(
+          middlewareMethods.middlewares,
+          "type",
+          (middleware) => container.resolve(middleware.token)
+        );
+        const afterMiddlewares = [
+          ...(_a2 = classMiddlewares.After) != null ? _a2 : [],
+          ...(_b2 = methodMiddlewares.After) != null ? _b2 : []
+        ];
+        const beforeMiddlewares = [
+          ...(_c = classMiddlewares.Before) != null ? _c : [],
+          ...(_d = methodMiddlewares.Before) != null ? _d : []
+        ];
+        for (const afterMiddleware of afterMiddlewares) {
+          const middlewareParamsMetadata = (_e = Reflect.getMetadata(
+            constants_default.paramsArg,
+            afterMiddleware,
+            "excecute"
+          )) != null ? _e : { params: [] };
+          const middlewareParams = middlewareParamsMetadata.params.map(resolveParams);
+          console.log(middlewareParams);
+          const response = yield afterMiddleware.excecute(...middlewareParams);
+          if (response === true) console.log("middleware passed");
+        }
+        controllerInstance[method](...methodParams);
+      });
+      if (ipcMethodMetadata.type === "invoke") {
+        ipcMain.handle(channel, listener);
+      } else if (ipcMethodMetadata.type === "send") {
+        ipcMain.on(channel, listener);
+      }
+    }
+  }
 }
 export {
   After,
   Before,
-  Body,
   Bootstrap,
   Controller,
   Global,
@@ -558,6 +761,7 @@ export {
   Module,
   OnInvoke,
   OnSend,
+  Payload,
   Request
 };
 //# sourceMappingURL=index.mjs.map

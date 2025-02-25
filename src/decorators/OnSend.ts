@@ -1,5 +1,5 @@
 import symbols from "@core/constants";
-import { IPCMethodMetadata, ItemIPCMethodMetadata } from "@core/metadata.types";
+import { IPCMethodMetadata } from "@core/metadata.types";
 
 export function OnSend(channel: string) {
   return function (
@@ -7,16 +7,10 @@ export function OnSend(channel: string) {
     propertyKey: string,
     descriptor: PropertyDescriptor
   ) {
-    const metadata: IPCMethodMetadata = Reflect.getMetadata(
-      symbols.onsend,
-      target,
-      propertyKey
-    ) ?? { methods: [] };
-    const metadataItem: ItemIPCMethodMetadata = {
+    const metadata: IPCMethodMetadata = {
       type: "send",
       channel,
     };
-    metadata.methods.push(metadataItem);
-    Reflect.defineMetadata(symbols.onsend, metadata, target, propertyKey);
+    Reflect.defineMetadata(symbols.ipcmethod, metadata, target, propertyKey);
   };
 }

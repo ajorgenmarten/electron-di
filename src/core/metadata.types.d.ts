@@ -3,7 +3,7 @@ import { Class, Token } from "./general.types";
 export type IProvider = { provide: Token; useClass: Class } | Class;
 export type ParamsDecorator =
   | "IpcEvent"
-  | "Body"
+  | "Payload"
   | "Headers"
   | "Request"
   | "Response";
@@ -23,10 +23,6 @@ export interface ItemMiddlewareMetadata {
   method?: string;
   token: Token;
 }
-export interface ItemIPCMethodMetadata {
-  type: "send" | "invoke";
-  channel: string;
-}
 
 export type InjectableMetadata = boolean;
 export type GlobalMetadata = boolean;
@@ -37,7 +33,8 @@ export interface ModuleMetadata {
   options: ModuleOptions;
 }
 export interface IPCMethodMetadata {
-  methods: ItemIPCMethodMetadata[];
+  type: "send" | "invoke";
+  channel: string;
 }
 export interface InjectMetadata {
   constructorArgs: Token[];

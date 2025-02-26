@@ -1,146 +1,209 @@
-import { Class } from "./general.types";
+import { ipcMain, IpcMainEvent, IpcMainInvokeEvent } from "electron";
 import symbols from "./constants";
 import { Container } from "./container";
+import { IController } from "./container.types";
+import { Class, IMiddleware, IRequest } from "./general.types";
+import { Logger } from "./logger";
 import {
   IPCMethodMetadata,
-  ItemParamMetadata,
   MiddlewareMetadata,
   ParamsMetadata,
 } from "./metadata.types";
-import { ipcMain, IpcMainEvent, IpcMainInvokeEvent } from "electron";
 import {
   Request as ElectronDIRequest,
   Response as ElectronDIResponse,
 } from "./params";
 
-function getMethodsNamesOfInstance<T>(instance: InstanceType<Class<T>>) {
-  const prototype = Object.getPrototypeOf(instance);
-  const methods = Object.getOwnPropertyNames(prototype).filter((methodName) => {
-    return (
-      typeof prototype[methodName] === "function" &&
-      methodName !== "constructor"
-    );
-  });
-  return methods;
-}
-
-function groupBy<T, M>(array: T[], key: keyof T, mapper?: (item: T) => M) {
-  const resultRecord: Record<string, (T | M)[]> = {};
-  for (const item of array) {
-    const value = item[key];
-    if ((value as string) in resultRecord) {
-      resultRecord[value as string].push(
-        typeof mapper === "function" ? mapper(item) : item
-      );
-    } else {
-      resultRecord[value as string] = [
-        typeof mapper === "function" ? mapper(item) : item,
-      ];
-    }
-  }
-  return resultRecord;
-}
-
 export function Bootstrap(module: Class) {
   const container = new Container();
   container.registerModule(module);
-  const controllers = container.Modules.map((module) => module.Controllers)
-    .flat()
-    .map((controller) => {
-      const controllerInstance = container.resolve(controller.Token);
-      const controllerPrefix = controller.Prefix.trim();
-      const controllerMiddlewares = controller.Middlewares.map((middleware) => {
-        const middlewareInstance = container.resolve(middleware.Token);
-        const middlewareType = middleware.Type;
-        return { middlewareInstance, middlewareType };
-      });
-      return { controllerInstance, controllerMiddlewares, controllerPrefix };
+
+  const getControllerMiddlewaresInfo = (controller: IController) => {
+    return controller.Middlewares.map((middlewareMetadata) => {
+      const middlewareInstance = container.resolve(middlewareMetadata.Token);
+      const middlewareType = middlewareMetadata.Type;
+      return { middlewareInstance, middlewareType };
     });
-  for (const controller of controllers) {
-    const { controllerInstance, controllerPrefix, controllerMiddlewares } =
-      controller;
-    const methods = getMethodsNamesOfInstance(controllerInstance);
-    for (const method of methods) {
-      const ipcMethodMetadata: IPCMethodMetadata = Reflect.getMetadata(
-        symbols.ipcmethod,
-        controllerInstance,
+  };
+
+  const getControllersInfo = (container: Container) => {
+    return container.Modules.map((module) => module.Controllers)
+      .flat()
+      .map((controller) => {
+        const instance = container.resolve(controller.Token);
+        const prefix = controller.Prefix.trim();
+        const middlewares = getControllerMiddlewaresInfo(controller);
+        return { instance, prefix, middlewares };
+      });
+  };
+
+  const getMethodNamesFromInstance = (instance: InstanceType<Class>) => {
+    const prototype = Object.getPrototypeOf(instance);
+    return Object.getOwnPropertyNames(prototype).filter((methodName) => {
+      return (
+        typeof prototype[methodName] === "function" &&
+        methodName !== "constructor"
+      );
+    });
+  };
+
+  const getMethodMetadata = (instance: InstanceType<Class>, method: string) => {
+    const methodMetadata: IPCMethodMetadata = Reflect.getMetadata(
+      symbols.ipcmethod,
+      instance,
+      method
+    );
+    return methodMetadata;
+  };
+
+  const getParamsMetadata = (instance: InstanceType<Class>, method: string) => {
+    const paramsMetadata: ParamsMetadata = Reflect.getMetadata(
+      symbols.paramsArg,
+      instance,
+      method
+    ) ?? { params: [] };
+    return paramsMetadata;
+  };
+
+  const getMethodMiddlewaresMetadata = (
+    instance: InstanceType<Class>,
+    method: string
+  ) => {
+    const middlewaresMetadata: MiddlewareMetadata = Reflect.getMetadata(
+      symbols.middlewares,
+      instance,
+      method
+    ) ?? { middlewares: [] };
+    return middlewaresMetadata;
+  };
+
+  const resolveParams = (
+    { params }: ParamsMetadata,
+    request: IRequest,
+    response: ElectronDIResponse,
+    event: IpcMainInvokeEvent | IpcMainEvent
+  ) => {
+    return params.map((param) => {
+      if (param.type === "IpcEvent") return event;
+      if (param.type === "Request") return request;
+      if (param.type === "Headers") return request.headers;
+      if (param.type === "Payload") return request.payload;
+      if (param.type === "Response") return response;
+      return undefined;
+    });
+  };
+
+  const groupBy = <T, M>(array: T[], key: keyof T, mapper?: (item: T) => M) => {
+    const resultRecord: Record<string, (T | M)[]> = {};
+    for (const item of array) {
+      const value = item[key];
+      if ((value as string) in resultRecord) {
+        resultRecord[value as string].push(
+          typeof mapper === "function" ? mapper(item) : item
+        );
+      } else {
+        resultRecord[value as string] = [
+          typeof mapper === "function" ? mapper(item) : item,
+        ];
+      }
+    }
+    return resultRecord;
+  };
+
+  const applyBeforeMiddlewares = async (
+    middlewares: IMiddleware<"Before">[],
+    request: IRequest,
+    response: ElectronDIResponse,
+    event: IpcMainInvokeEvent | IpcMainEvent
+  ) => {
+    for (const middleware of middlewares) {
+      const middlewareParamsMetadata: ParamsMetadata = Reflect.getMetadata(
+        symbols.paramsArg,
+        middleware,
+        "excecute"
+      );
+      const middlewareParams = resolveParams(
+        middlewareParamsMetadata,
+        request,
+        response,
+        event
+      );
+      const res = await middleware.excecute(...middlewareParams);
+      if (res === false) return false;
+    }
+    return true;
+  };
+
+  const controllersInfo = getControllersInfo(container);
+
+  for (const { instance, prefix, middlewares } of controllersInfo) {
+    const instanceMethdoNames = getMethodNamesFromInstance(instance);
+    for (const method of instanceMethdoNames) {
+      const methodMetadata = getMethodMetadata(instance, method);
+      const paramsMetadata = getParamsMetadata(instance, method);
+      const methodMiddlewaresMetadata = getMethodMiddlewaresMetadata(
+        instance,
         method
       );
-      const paramsArgsMetadata: ParamsMetadata = Reflect.getMetadata(
-        symbols.paramsArg,
-        controllerInstance,
-        method
-      ) ?? { params: [] };
-      const middlewareMethods: MiddlewareMetadata = Reflect.getMetadata(
-        symbols.middlewares,
-        controllerInstance,
-        method
-      ) ?? { middlewares: [] };
-      if (!ipcMethodMetadata) continue;
-      const methodChannel = ipcMethodMetadata.channel.trim();
-      const channel = controllerPrefix
-        ? `${controllerPrefix}:${methodChannel}`
-        : methodChannel;
+
+      if (!methodMetadata) continue;
+      const methodChannel = methodMetadata.channel.trim();
+      const channel = prefix ? `${prefix}:${methodChannel}` : methodChannel;
+
       const listener = async (
         event: IpcMainInvokeEvent | IpcMainEvent,
         ...args: any[]
-      ) => {
+      ): Promise<IRequest> => {
         const request = new ElectronDIRequest(args[0]).toPlainObject();
-        const resposne = new ElectronDIResponse();
-        const resolveParams = (param: ItemParamMetadata) => {
-          if (param.type === "IpcEvent") {
-            return event;
-          }
-          if (param.type === "Request") {
-            return request;
-          }
-          if (param.type === "Headers") {
-            return request.headers;
-          }
-          if (param.type === "Payload") {
-            return request.payload;
-          }
-          if (param.type === "Response") {
-            return resposne;
-          }
-          return undefined;
-        };
-        const methodParams = paramsArgsMetadata.params.map(resolveParams);
-        const classMiddlewares = groupBy(
-          controllerMiddlewares,
-          "middlewareType",
-          (middleware) => middleware.middlewareInstance
-        );
+        const response = new ElectronDIResponse();
+        const params = resolveParams(paramsMetadata, request, response, event);
         const methodMiddlewares = groupBy(
-          middlewareMethods.middlewares,
+          methodMiddlewaresMetadata.middlewares,
           "type",
           (middleware) => container.resolve(middleware.token)
         );
-        const afterMiddlewares = [
-          ...(classMiddlewares.After ?? []),
-          ...(methodMiddlewares.After ?? []),
-        ];
+        const controllerMiddlewares = groupBy(
+          middlewares,
+          "middlewareType",
+          (middleware) => middleware.middlewareInstance
+        );
         const beforeMiddlewares = [
-          ...(classMiddlewares.Before ?? []),
+          ...(controllerMiddlewares.Before ?? []),
           ...(methodMiddlewares.Before ?? []),
         ];
-        for (const afterMiddleware of afterMiddlewares) {
-          const middlewareParamsMetadata: ParamsMetadata = Reflect.getMetadata(
-            symbols.paramsArg,
-            afterMiddleware,
-            "excecute"
-          ) ?? { params: [] };
-          const middlewareParams =
-            middlewareParamsMetadata.params.map(resolveParams);
-          console.log(middlewareParams);
-          const response = await afterMiddleware.excecute(...middlewareParams);
-          if (response === true) console.log("middleware passed");
+        try {
+          const beforeMiddlewaresResult = await applyBeforeMiddlewares(
+            beforeMiddlewares,
+            request,
+            response,
+            event
+          );
+          if (beforeMiddlewaresResult === false)
+            return {
+              headers: { success: "false" },
+              payload: { error: "Before middlewares failed" },
+            };
+        } catch (error) {
+          Logger.error(
+            (error as Error).message ?? "Unknown error",
+            (error as Error).name
+          );
+          return {
+            headers: { success: "false" },
+            payload: { error: (error as Error).message ?? error },
+          };
         }
-        controllerInstance[method](...methodParams);
+        const responseController = await instance[method](...params);
+        if (typeof responseController === "undefined")
+          return response.toPlainObject();
+        if (responseController instanceof ElectronDIResponse)
+          return responseController.toPlainObject();
+        return response.send(responseController).toPlainObject();
       };
-      if (ipcMethodMetadata.type === "invoke") {
+
+      if (methodMetadata.type === "invoke") {
         ipcMain.handle(channel, listener);
-      } else if (ipcMethodMetadata.type === "send") {
+      } else if (methodMetadata.type === "send") {
         ipcMain.on(channel, listener);
       }
     }

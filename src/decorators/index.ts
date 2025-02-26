@@ -11,3 +11,4 @@ export * from "./Module";
 export * from "./OnInvoke";
 export * from "./OnSend";
 export * from "./Request";
+export * from "./Response";

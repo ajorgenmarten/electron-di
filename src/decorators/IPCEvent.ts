@@ -1,4 +1,4 @@
-import { ParamsMetadata } from "@core/metadata.types";
+import { ParamsMetadata } from "@typedefs/metadata.types";
 import symbols from "@core/constants";
 import { IpcMainEvent, IpcMainInvokeEvent } from "electron";
 

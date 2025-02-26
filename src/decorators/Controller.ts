@@ -1,4 +1,4 @@
-import { ControllerMetadata } from "@core/metadata.types";
+import { ControllerMetadata } from "@typedefs/metadata.types";
 import symbols from "@core/constants";
 
 export function Controller(prefix?: string) {

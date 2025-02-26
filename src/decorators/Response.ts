@@ -1,5 +1,5 @@
 import symbols from "@core/constants";
-import { ParamsMetadata } from "@core/metadata.types";
+import { ParamsMetadata } from "@typedefs/metadata.types";
 
 export function Response() {
   return function (target: any, propertyKey: string, paramIndex: number) {

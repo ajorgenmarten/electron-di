@@ -1,5 +1,5 @@
-import { InjectMetadata } from "@core/metadata.types";
-import { Token } from "@core/general.types";
+import { InjectMetadata } from "@typedefs/metadata.types";
+import { Token } from "@typedefs/general.types";
 import symbols from "@core/constants";
 
 export function Inject(token: Token) {

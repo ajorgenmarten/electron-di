@@ -1,6 +1,6 @@
-import { InjectableMetadata } from "@core/metadata.types";
+import { InjectableMetadata } from "@typedefs/metadata.types";
 import symbols from "@core/constants";
-import { Class } from "@core/general.types";
+import { Class } from "@typedefs/general.types";
 
 export function Injectable() {
   return function (target: Class) {

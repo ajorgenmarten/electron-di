@@ -5,7 +5,7 @@ import {
   ILinkObject,
   IMiddleware,
   IModule,
-} from "./container.types";
+} from "@typedefs/container.types";
 import {
   ControllerMetadata,
   GlobalMetadata,
@@ -15,8 +15,8 @@ import {
   ItemMiddlewareMetadata,
   MiddlewareMetadata,
   ModuleMetadata,
-} from "./metadata.types";
-import { Class, Token } from "./general.types";
+} from "@typedefs/metadata.types";
+import { Class, Token } from "@typedefs/general.types";
 import symbols from "./constants";
 
 abstract class Component implements IComponent {

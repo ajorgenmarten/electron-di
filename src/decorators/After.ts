@@ -2,8 +2,8 @@ import symbols from "@core/constants";
 import {
   ItemMiddlewareMetadata,
   MiddlewareMetadata,
-} from "@core/metadata.types";
-import { Token } from "@core/general.types";
+} from "@typedefs/metadata.types";
+import { Token } from "@typedefs/general.types";
 
 export function After(token: Token) {
   return function (

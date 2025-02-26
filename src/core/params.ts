@@ -1,4 +1,4 @@
-import { IRequest, IResponse } from "./general.types";
+import { IRequest, IResponse } from "@typedefs/general.types";
 
 /**
  * Representa un objeto que contiene los datos que se envian a través de un método IPC, se usa para validar que el formato de los datos sea correcto

@@ -1,5 +1,5 @@
 import symbols from "@core/constants";
-import { IPCMethodMetadata } from "@core/metadata.types";
+import { IPCMethodMetadata } from "@typedefs/metadata.types";
 
 export function OnInvoke(channel: string) {
   return function (

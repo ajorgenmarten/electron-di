@@ -1,14 +1,14 @@
 import { ipcMain, IpcMainEvent, IpcMainInvokeEvent } from "electron";
 import symbols from "./constants";
 import { Container } from "./container";
-import { IController } from "./container.types";
-import { Class, IMiddleware, IRequest } from "./general.types";
+import { IController } from "../types/container.types";
+import { Class, IMiddleware, IRequest } from "../types/general.types";
 import { Logger } from "./logger";
 import {
   IPCMethodMetadata,
   MiddlewareMetadata,
   ParamsMetadata,
-} from "./metadata.types";
+} from "../types/metadata.types";
 import {
   Request as ElectronDIRequest,
   Response as ElectronDIResponse,

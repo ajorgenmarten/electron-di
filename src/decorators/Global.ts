@@ -1,6 +1,6 @@
 import symbols from "@core/constants";
-import { GlobalMetadata } from "@core/metadata.types";
-import { Class } from "@core/general.types";
+import { GlobalMetadata } from "@typedefs/metadata.types";
+import { Class } from "@typedefs/general.types";
 
 export function Global() {
   return function (target: Class) {

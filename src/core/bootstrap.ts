@@ -117,8 +117,7 @@ export function Bootstrap(module: Class) {
     event: IpcMainInvokeEvent | IpcMainEvent
   ) => {
     for (const middleware of middlewares) {
-      const middlewareParamsMetadata: ParamsMetadata = Reflect.getMetadata(
-        symbols.paramsArg,
+      const middlewareParamsMetadata: ParamsMetadata = getParamsMetadata(
         middleware,
         "excecute"
       );
@@ -132,6 +131,26 @@ export function Bootstrap(module: Class) {
       if (res === false) return false;
     }
     return true;
+  };
+
+  const applyAfterMiddlewares = async (
+    middlewares: IMiddleware<"After">[],
+    request: IRequest,
+    response: ElectronDIResponse,
+    event: IpcMainInvokeEvent | IpcMainEvent
+  ) => {
+    const excecutedMiddlewares: (Promise<void> | void)[] = [];
+    for (const middleware of middlewares) {
+      const middlewareParams = getParamsMetadata(middleware, "excecute");
+      const resolvedParams = resolveParams(
+        middlewareParams,
+        request,
+        response,
+        event
+      );
+      excecutedMiddlewares.push(middleware.excecute(...resolvedParams));
+    }
+    await Promise.all(excecutedMiddlewares);
   };
 
   const controllersInfo = getControllersInfo(container);
@@ -168,8 +187,12 @@ export function Bootstrap(module: Class) {
           (middleware) => middleware.middlewareInstance
         );
         const beforeMiddlewares = [
-          ...(controllerMiddlewares.Before ?? []),
-          ...(methodMiddlewares.Before ?? []),
+          ...(controllerMiddlewares.Before ?? []).reverse(),
+          ...(methodMiddlewares.Before ?? []).reverse(),
+        ];
+        const afterMiddlewares = [
+          ...(controllerMiddlewares.After ?? []).reverse(),
+          ...(methodMiddlewares.After ?? []).reverse(),
         ];
         try {
           const beforeMiddlewaresResult = await applyBeforeMiddlewares(
@@ -194,11 +217,16 @@ export function Bootstrap(module: Class) {
           };
         }
         const responseController = await instance[method](...params);
-        if (typeof responseController === "undefined")
-          return response.toPlainObject();
-        if (responseController instanceof ElectronDIResponse)
-          return responseController.toPlainObject();
-        return response.send(responseController).toPlainObject();
+        const toresponse =
+          typeof responseController === "undefined"
+            ? response.toPlainObject()
+            : responseController instanceof ElectronDIResponse
+              ? responseController.toPlainObject()
+              : response.send(responseController).toPlainObject();
+
+        await applyAfterMiddlewares(afterMiddlewares, request, response, event);
+
+        return toresponse;
       };
 
       if (methodMetadata.type === "invoke") {

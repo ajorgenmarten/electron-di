@@ -739,8 +739,7 @@ function Bootstrap(module2) {
   };
   const applyBeforeMiddlewares = (middlewares2, request, response, event) => __async(this, null, function* () {
     for (const middleware of middlewares2) {
-      const middlewareParamsMetadata = Reflect.getMetadata(
-        constants_default.paramsArg,
+      const middlewareParamsMetadata = getParamsMetadata(
         middleware,
         "excecute"
       );
@@ -754,6 +753,20 @@ function Bootstrap(module2) {
       if (res === false) return false;
     }
     return true;
+  });
+  const applyAfterMiddlewares = (middlewares2, request, response, event) => __async(this, null, function* () {
+    const excecutedMiddlewares = [];
+    for (const middleware of middlewares2) {
+      const middlewareParams = getParamsMetadata(middleware, "excecute");
+      const resolvedParams = resolveParams(
+        middlewareParams,
+        request,
+        response,
+        event
+      );
+      excecutedMiddlewares.push(middleware.excecute(...resolvedParams));
+    }
+    yield Promise.all(excecutedMiddlewares);
   });
   const controllersInfo = getControllersInfo(container);
   for (const { instance, prefix, middlewares: middlewares2 } of controllersInfo) {
@@ -769,7 +782,7 @@ function Bootstrap(module2) {
       const methodChannel = methodMetadata.channel.trim();
       const channel = prefix ? `${prefix}:${methodChannel}` : methodChannel;
       const listener = (event, ...args) => __async(this, null, function* () {
-        var _a, _b, _c, _d;
+        var _a, _b, _c, _d, _e, _f;
         const request = new Request2(args[0]).toPlainObject();
         const response = new Response2();
         const params = resolveParams(paramsMetadata, request, response, event);
@@ -784,8 +797,12 @@ function Bootstrap(module2) {
           (middleware) => middleware.middlewareInstance
         );
         const beforeMiddlewares = [
-          ...(_a = controllerMiddlewares.Before) != null ? _a : [],
-          ...(_b = methodMiddlewares.Before) != null ? _b : []
+          ...((_a = controllerMiddlewares.Before) != null ? _a : []).reverse(),
+          ...((_b = methodMiddlewares.Before) != null ? _b : []).reverse()
+        ];
+        const afterMiddlewares = [
+          ...((_c = controllerMiddlewares.After) != null ? _c : []).reverse(),
+          ...((_d = methodMiddlewares.After) != null ? _d : []).reverse()
         ];
         try {
           const beforeMiddlewaresResult = yield applyBeforeMiddlewares(
@@ -801,20 +818,18 @@ function Bootstrap(module2) {
             };
         } catch (error) {
           Logger.error(
-            (_c = error.message) != null ? _c : "Unknown error",
+            (_e = error.message) != null ? _e : "Unknown error",
             error.name
           );
           return {
             headers: { success: "false" },
-            payload: { error: (_d = error.message) != null ? _d : error }
+            payload: { error: (_f = error.message) != null ? _f : error }
           };
         }
         const responseController = yield instance[method](...params);
-        if (typeof responseController === "undefined")
-          return response.toPlainObject();
-        if (responseController instanceof Response2)
-          return responseController.toPlainObject();
-        return response.send(responseController).toPlainObject();
+        const toresponse = typeof responseController === "undefined" ? response.toPlainObject() : responseController instanceof Response2 ? responseController.toPlainObject() : response.send(responseController).toPlainObject();
+        yield applyAfterMiddlewares(afterMiddlewares, request, response, event);
+        return toresponse;
       });
       if (methodMetadata.type === "invoke") {
         ipcMain.handle(channel, listener);

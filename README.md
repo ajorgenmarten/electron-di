@@ -1,151 +1,19 @@
-# Electron Dependency Injection (Electron DI)
+# ELECTRON DI
 
-Este proyecto proporciona un sistema de inyección de dependencias y manejo de controladores IPC para aplicaciones construidas con Electron y TypeScript.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+[![Electron Version](https://img.shields.io/badge/electron->=30.0.2-blue)](https://www.electronjs.org/)
 
-## Estructura del Proyecto
+Este proyecto tiene como objetivo facilitar la creación de aplicaciones de escritorio multiplataforma utilizando Electron, combinado con una arquitectura modular y escalable inspirada en NestJS. La idea es aprovechar las mejores prácticas de desarrollo backend, como la inyección de dependencias, módulos y controladores, para construir aplicaciones de escritorio robustas y mantenibles. El enfoque busca simplificar el desarrollo, promoviendo la reutilización de código y una estructura clara, ideal para proyectos complejos o equipos que deseen aplicar patrones modernos de desarrollo en aplicaciones de escritorio.
 
-- `constants.ts`: Define constantes utilizadas en el proyecto.
-- `decorators.ts`: Contiene decoradores para facilitar la inyección de dependencias y el manejo de IPC en Electron.
-- `container.ts`: Implementa el contenedor de dependencias y la resolución de módulos.
-- `bootstrap.ts`: Configura y registra los módulos y controladores IPC en la aplicación Electron.
-- `utils.ts`: Proporciona funciones auxiliares y gestión de errores.
-- `types.ts`: Define los tipos utilizados en el sistema de inyección de dependencias.
+## Características principales de esta talla
 
-## Instalación
+- **Inyección de dependencias:** El proyecto implementa un sistema de inyección de dependencias inspirado en frameworks como NestJS, permitiendo una gestión eficiente y organizada de los componentes de la aplicación. Este enfoque facilita la desacoplamiento del código, mejora la testabilidad y promueve la reutilización de servicios y módulos. Con la DI, los desarrolladores pueden definir y administrar dependencias de manera centralizada, simplificando el mantenimiento y escalabilidad de las aplicaciones de Electron.
 
-* En tu aplicacion de electron:
-   ```sh
-   npm install electron-di
-   ```
+- **Modularización:** El proyecto adopta un enfoque de modularización que organiza la aplicación en módulos independientes y cohesivos, siguiendo principios similares a los de NestJS. Cada módulo encapsula funcionalidades específicas, como servicios, controladores o utilidades, lo que facilita la organización del código y su mantenimiento. Esta estructura modular permite a los desarrolladores escalar la aplicación de manera eficiente, reutilizar componentes y mantener un flujo de trabajo claro y ordenado.
 
-## Uso
+- **Middlewares:** El proyecto introduce un sistema avanzado de middlewares para aplicaciones de Electron, inspirado en frameworks modernos como NestJS. Estos middlewares se dividen en dos tipos clave:
 
-Puedes utilizar los decoradores y la inyección de dependencias en tu aplicación Electron de la siguiente manera:
+  - **Middlewares Before:** Se ejecutan **antes** de que la solicitud llegue al método del controlador. Son ideales para validaciones, autenticación o lógica previa. Si algún middleware before falla, se detiene la ejecución y no se llega al controlador.
+  - **Middlewares After:** Se ejecutan **después** de que el controlador ha procesado la solicitud y ha generado una respuesta. Son útiles para tareas como logging, transformación de respuestas o limpieza de recursos.
 
-```typescript
-import { Injectable, Controller, Inject, Module, Bootstrap, OnInvoke } from "electron-di";
-
-@Injectable()
-export class AppRepository {
-    rendomName() {
-        const names = ['John', 'Jane', 'Jack', 'Jill', 'Bob', 'Bill', 'Steve', 'Tom'];
-        return names[Math.floor(Math.random() * names.length)];
-    }
-}
-
-@Injectable()
-export class AppService {
-    constructor(
-        @Inject(AppRepository) private readonly appRepository: AppRepository
-    ) {}
-
-    getAppInfo() {
-        return {
-            name: this.appRepository.rendomName(),
-            version: '0.0.0'
-        };
-    }
-}
-
-@Controller('app')
-export class AppController {
-    constructor(
-        @Inject(AppService) private readonly appService: AppService,
-    ) {}
-
-    @OnInvoke('randomInfo')
-    async getAppInfo() {
-        return this.appService.getAppInfo();
-    }
-
-    @OnInvoke('fixedValue')
-    async fixed() {
-        return "valor fijo";
-    }
-}
-
-@Module({
-    providers: [AppService, AppRepository],
-    controllers: [AppController]
-})
-export class AppModule {}
-
-Bootstrap(AppModule);
-```
-
-### Un ejemplo de codigo completo
-```typescript
-import { OnInvoke, Injectable, Inject, Controller as Ctrl, Module, Middleware as Mdlw, CanActivate } from 'electron-di'
-
-abstract class Repository {
-    abstract findAll(): Promise<any[]>
-}
-
-@Injectable()
-class Middleware implements CanActivate {
-    constructor(@Inject(Repository) private repository: Repository) { }
-    async execute() {
-        console.log('Middleware', await this.repository.findAll())
-        return true
-    }
-}
-
-@Injectable()
-class Service {
-    constructor(@Inject(Repository) private repository: Repository) { }
-
-    async doSomething() {
-        const data = await this.repository.findAll()
-        return data
-    }
-}
-
-@Ctrl()
-class Controller {
-    constructor(@Inject(Service) private service: Service) { }
-
-    @Mdlw(Middleware)
-    @OnInvoke('test')
-    async test() {
-        const data = await this.service.doSomething()
-        return data
-    }
-}
-
-@Injectable()
-class RepositoryImpl implements Repository {
-    async findAll() {
-        return [1, 2, 3]
-    }
-}
-
-@Module({
-    providers: [
-        { provide: Repository, useClass: RepositoryImpl },
-        Service,
-        Middleware,
-    ],
-    controllers: [Controller],
-})
-export class ExampleModule {}
-```
-
-## Contribuciones
-
-Si deseas contribuir a este proyecto, por favor sigue estos pasos:
-1. Haz un fork del repositorio.
-2. Crea una nueva rama con tu funcionalidad (`git checkout -b mi-nueva-funcionalidad`).
-3. Realiza tus cambios y confirma los commits (`git commit -m 'Añadir nueva funcionalidad'`).
-4. Sube los cambios (`git push origin mi-nueva-funcionalidad`).
-5. Abre un Pull Request en el repositorio original.
-
-Asegúrate de seguir las guías de estilo y estándares de código definidos en el archivo `CONTRIBUTING.md`.
-
-## Licencia
-
-Este proyecto está bajo la licencia ISC. Consulta el archivo `LICENSE` para más detalles.
-
-## Contacto
-
-Si tienes alguna pregunta o sugerencia, no dudes en abrir un issue en el repositorio o contactar al equipo de desarrollo a través de <ajorgenmarten35@gmail.com>.
-
+  Esta dualidad permite un control granular sobre el flujo de la aplicación, brindando flexibilidad y potencia para manejar escenarios complejos en aplicaciones de escritorio.

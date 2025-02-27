@@ -9,7 +9,6 @@ export type ParamsDecorator =
   | "Response";
 export interface ItemParamMetadata {
   type: ParamsDecorator;
-  key?: string;
 }
 
 export interface ModuleOptions {

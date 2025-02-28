@@ -1,4 +1,4 @@
-# ELECTRON DI
+# **ELECTRON DI**
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 [![Electron Version](https://img.shields.io/badge/electron-~30.0.2-blue)](https://www.electronjs.org/)
@@ -35,19 +35,9 @@ Después de instalar el paquete, habilita en el tsconfig.json la opcion de **exp
   }
 ```
 
-## Tabla de Contenidos
-
-1. [Decoradores](#descripción)
-2. [Decoradores de clases](#características-principales)
-3. [Decoradores de metodos](#requisitos-previos)
-4. [Decoradores de argumentos](#instalación)
-5. [Uso](#uso)
-
 ## Decoradores
 
 Este paquete proporciona un conjunto de decoradores diseñados específicamente para facilitar la inyección de dependencias y la resolución de módulos de Electron. Estos decoradores te permiten gestionar de manera eficiente las dependencias de tu aplicación y acceder a los módulos principales de Electron (main y renderer) de forma segura y organizada.
-
-## Decoradores de clase
 
 ## Decorador `@Module`
 
@@ -56,7 +46,6 @@ El decorador `@Module` se utiliza para definir un módulo en tu aplicación. Un 
 ### Opciones del decorador `@Module`
 
 - `providers` (opcional): Un arreglo de clases decoradas con `@Injectable` que representan los servicios o proveedores de este módulo. Estos proveedores pueden ser inyectados en otros componentes del módulo, como controladores o otros servicios.
-
   ```typescript
   providers: [
     MiServicio,
@@ -67,77 +56,9 @@ El decorador `@Module` se utiliza para definir un módulo en tu aplicación. Un 
     },
   ];
   ```
-
   > **`ℹ️ Nota:`** Puedes registrar los servicios simplemente agregando la clase decorada con `@Injectable` o con un objeto que tienes dos valores, el `provide` y `useClass`.
-
   - `provide`: Acepta una clase asbtracta o una clase común, que es valor con el que se van a identificar a la hora de resolver la dependencia en otro proveedor, en un controlador o middleware, (Este no tiene que estar decorado con `@Injectable`).
   - `useClass`: Solo acepta clase común, que estas si deben estar decoradas con `@Injectable`, esta es la verdadera clase que se va a resolver e inyectar en proveedores, controladores etc...
-
-    ```typescript
-    import {
-      Injectable,
-      Inject,
-      Controller,
-      Module,
-      OnInvoke,
-    } from "electron-di";
-
-    abstract class AppRepository {
-      abstract getRandomName(): string;
-    }
-
-    @Injectable()
-    class AppRepositoryImplementation implements AppRepository {
-      private names = [
-        "Alejandro",
-        "Andrea",
-        "Angela",
-        "Amanda",
-        "Raudenis",
-        "Mayara",
-        "Michel Paxulo",
-      ];
-      getRandomName() {
-        return this.names[Math.floor(Math.random() * this.names.length)];
-      }
-    }
-
-    @Injectable()
-    class AppService {
-      constructor(
-        @Inject(AppRepository) private readonly appRepository: AppRepository
-      ) {}
-      greet() {
-        return `Hello ${this.appRepository.getRandomName()}!`;
-      }
-    }
-
-    @Controller("app")
-    class AppController {
-      constructor(
-        @Inject(AppService) private readonly appService: AppService
-      ) {}
-
-      @OnInvoke("greet")
-      async greet() {
-        return this.appService.greet();
-      }
-    }
-
-    @Module({
-      providers: [
-        AppService,
-        {
-          provide: AppRepository,
-          useClass: AppRepositoryImplementation,
-        },
-      ],
-      controllers: [AppController],
-      exports: [AppRepository],
-    })
-    export class AppModule {}
-    ```
-
 - `imports` (opcional): Un arreglo de módulos que exportan proveedores que este módulo necesita. Los proveedores exportados por estos módulos estarán disponibles para inyección en este módulo.
   ```typescript
   imports: [OtroModulo, OtroModuleMas];
@@ -166,7 +87,242 @@ import { Module } from "electron-di";
 export class MiModulo {}
 ```
 
+### Uso avanzado
+
+```typescript
+import { Injectable, Inject, Controller, Module, OnInvoke } from "electron-di";
+
+abstract class AppRepository {
+  abstract getRandomName(): string;
+}
+
+@Injectable()
+class AppRepositoryImplementation implements AppRepository {
+  private names = [
+    "Alejandro",
+    "Andrea",
+    "Angela",
+    "Amanda",
+    "Raudenis",
+    "Mayara",
+    "Michel Paxulo",
+  ];
+  getRandomName() {
+    return this.names[Math.floor(Math.random() * this.names.length)];
+  }
+}
+
+@Injectable()
+class AppService {
+  constructor(
+    @Inject(AppRepository) private readonly appRepository: AppRepository
+  ) {}
+  greet() {
+    return `Hello ${this.appRepository.getRandomName()}!`;
+  }
+}
+
+@Controller("app")
+class AppController {
+  constructor(@Inject(AppService) private readonly appService: AppService) {}
+
+  @OnInvoke("greet")
+  async greet() {
+    return this.appService.greet();
+  }
+}
+
+@Module({
+  providers: [
+    AppService,
+    {
+      provide: AppRepository,
+      useClass: AppRepositoryImplementation,
+    },
+  ],
+  controllers: [AppController],
+  exports: [AppRepository],
+})
+export class AppModule {}
+```
+
 ## Decorador `@Injectable`
+
+El decorador `@Injectable` se utiliza para marcar una clase como autoinyectable. Esto significa que la clase será gestionada automáticamente por el contenedor de inyección de dependencias, y sus instancias podrán ser inyectadas en otras clases que las requieran sin necesidad de instanciarlas manualmente.
+
+### Uso Básico
+
+```typescript
+import { Injectable } from "electron-di";
+
+@Injectable()
+export class ExampleProvider {}
+```
+
+## Decorador `@Controller`
+
+El decorador `@Controller` se utiliza para marcar una clase como un controlador que maneja métodos de punto de entrada **IPC (Inter-Process Communication)** en tu aplicación de Electron. Este decorador acepta un parámetro opcional que define un prefijo de ruta para todos los métodos IPC contenidos en la clase.
+
+### Uso Básico
+
+```typescript
+import { Controller } from "electron-di";
+
+@Controller()
+export class AppController {}
+
+@Controller("some")
+export class SomeController {}
+```
+
+## Decorador `@Global`
+
+El decorador `@Global` se utiliza para marcar un módulo como global. Esto significa que los proveedores exportados por este módulo estarán disponibles para todos los demás módulos de la aplicación sin necesidad de importar el módulo global explícitamente. Es especialmente útil para proveedores que se utilizan en toda la aplicación, como configuraciones, servicios de utilidad o conexiones a bases de datos.
+
+> **`ℹ️ Nota:`** Este decorador solo se puede usar en modulos tal como en el ejemplo siguiente
+
+```typescript
+import { Module, Global } from "electron-di";
+
+@Global()
+@Module({
+  providers: [ORMService],
+  exports: [ORMService],
+})
+export class ORMModule {}
+```
+
+## Decoradores `@Before` y `@After`
+
+Los decoradores `@Before` y `@After` se utilizan para aplicar middlewares a métodos o clases decoradas con `@Controller`. Estos middlewares permiten ejecutar lógica adicional antes `(@Before)` o después `(@After)` de que se ejecute el método del controlador.
+
+### Características principales
+
+- **Middlware:** Permiten ejecutar lógica adicional antes o después de un método
+- **Aplicación:** Solo se pueden aplicar a métodos o clases decoradas con `@Controller`.
+- **Proveedores:** Aceptan un proveedor (clase decorada con `@Injectable`) que debe implementar un método `execute`.
+- **Retorno:** El método `execute` del proveedor que usa el decorador debe retornar un booleano en caso de ser usado con `@Before` y void con `@After`
+
+### Uso Básico
+
+```typescript
+import {
+  Injectable,
+  Controller,
+  Before,
+  type IMiddleware,
+  OnInvoke,
+} from "electron-di";
+
+@Injectable()
+class BeforeAll implements IMiddleware<"Before"> {
+  async excecute() {
+    console.log("Before all\n");
+    const validations = true;
+    return validations;
+  }
+}
+
+@Injectable()
+class BeforeGreet implements IMiddleware<"Before"> {
+  async excecute() {
+    console.log("Before Greet\n");
+    const validations = true;
+    return validations;
+  }
+}
+
+@Before(BeforeAll)
+@Controller("app")
+class AppController {
+  @Before(BeforeGreet)
+  @OnInvoke("foo")
+  async foo() {
+    console.log("foo\n");
+    return "foo";
+  }
+
+  @OnInvoke("bar")
+  async bar() {
+    console.log("bar\n");
+    return "bar";
+  }
+}
+```
+
+En el ejemplo anterior si se hace una llamada IPC con el metodo invoke a `app:foo` se mostrará en consola lo sigiente:
+
+```bash
+ > Before all
+   Before Greet
+   foo
+```
+
+Y si la llamada se hace a `app:bar` se mostraría lo siguiente:
+
+```bash
+ > Before all
+   bar
+```
+
+### Ejemplo con `@After`
+
+```typescript
+import {
+  Injectable,
+  Controller,
+  After,
+  type IMiddleware,
+  OnInvoke,
+} from "electron-di";
+
+@Injectable()
+class AfterAll implements IMiddleware<"After"> {
+  async excecute() {
+    console.log("After all\n");
+  }
+}
+
+@Injectable()
+class AfterGreet implements IMiddleware<"After"> {
+  async excecute() {
+    console.log("After Greet\n");
+  }
+}
+
+@After(AfterAll)
+@Controller("app")
+class AppController {
+  @After(AfterGreet)
+  @OnInvoke("foo")
+  async foo() {
+    console.log("foo\n");
+    return "foo";
+  }
+
+  @OnInvoke("bar")
+  async bar() {
+    console.log("bar\n");
+    return "bar";
+  }
+}
+```
+
+En el ejemplo anterior si se hace una llamada IPC con el metodo invoke a `app:foo` se mostrará en consola lo sigiente:
+
+```bash
+ > foo
+   After all
+   After Greet
+
+```
+
+Y si la llamada se hace a `app:bar` se mostraría lo siguiente:
+
+```bash
+ > bar
+   After all
+```
 
 ## Autor
 

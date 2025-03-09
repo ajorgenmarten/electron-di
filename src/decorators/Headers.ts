@@ -8,7 +8,7 @@ export function Headers(key?: string) {
       target,
       propertyKey
     ) ?? { params: [] };
-    metadata.params[paramIndex] = { type: "Headers", key };
+    metadata.params[paramIndex] = { type: "Headers" };
     Reflect.defineMetadata(symbols.paramsArg, metadata, target, propertyKey);
   };
 }

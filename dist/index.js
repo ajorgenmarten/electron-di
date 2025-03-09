@@ -254,7 +254,7 @@ function Before(token) {
 }
 
 // src/decorators/Payload.ts
-function Payload(key) {
+function Payload() {
   return function(target, propertyKey, paramIndex) {
     var _a;
     const metadata = (_a = Reflect.getMetadata(
@@ -262,7 +262,7 @@ function Payload(key) {
       target,
       propertyKey
     )) != null ? _a : { params: [] };
-    metadata.params[paramIndex] = { type: "Payload", key };
+    metadata.params[paramIndex] = { type: "Payload" };
     Reflect.defineMetadata(constants_default.paramsArg, metadata, target, propertyKey);
   };
 }
@@ -292,7 +292,7 @@ function Headers(key) {
       target,
       propertyKey
     )) != null ? _a : { params: [] };
-    metadata.params[paramIndex] = { type: "Headers", key };
+    metadata.params[paramIndex] = { type: "Headers" };
     Reflect.defineMetadata(constants_default.paramsArg, metadata, target, propertyKey);
   };
 }
@@ -319,7 +319,7 @@ function Injectable() {
 }
 
 // src/decorators/IPCEvent.ts
-function IPCEvent(key) {
+function IPCEvent() {
   return function(target, propertyKey, paramIndex) {
     var _a;
     const metadata = (_a = Reflect.getMetadata(
@@ -327,7 +327,7 @@ function IPCEvent(key) {
       target,
       propertyKey
     )) != null ? _a : { params: [] };
-    metadata.params[paramIndex] = { type: "IpcEvent", key };
+    metadata.params[paramIndex] = { type: "IpcEvent" };
     Reflect.defineMetadata(constants_default.paramsArg, metadata, target, propertyKey);
   };
 }
@@ -691,7 +691,7 @@ var Response2 = class {
   toPlainObject() {
     return {
       headers: __spreadValues({}, this.headers),
-      payload: this.payload ? this.payload : void 0
+      payload: this.payload
     };
   }
 };

@@ -1,5 +1,3 @@
-import { IpcMainInvokeEvent, IpcMainEvent } from 'electron';
-
 declare const COLORS: {
     BACKGROUND: {
         LIGHT: {
@@ -116,7 +114,7 @@ declare function After(token: Token): (target: any, propertyKey?: string | undef
 
 declare function Before(token: Token): (target: any, propertyKey?: string | undefined, _propertyDescriptor?: PropertyDescriptor) => void;
 
-declare function Payload(key?: string): (target: any, propertyKey: string, paramIndex: number) => void;
+declare function Payload(): (target: any, propertyKey: string, paramIndex: number) => void;
 
 declare function Controller(prefix?: string): (target: any) => void;
 
@@ -128,7 +126,7 @@ declare function Inject(token: Token): (target: any, propertyKey: string | undef
 
 declare function Injectable(): (target: Class) => void;
 
-declare function IPCEvent(key?: keyof (IpcMainInvokeEvent & IpcMainEvent)): (target: any, propertyKey: string, paramIndex: number) => void;
+declare function IPCEvent(): (target: any, propertyKey: string, paramIndex: number) => void;
 
 type IProvider = { provide: Token; useClass: Class } | Class;
 

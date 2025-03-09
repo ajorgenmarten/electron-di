@@ -68,7 +68,7 @@ export class Response<T = any> implements IResponse<T> {
   toPlainObject() {
     return {
       headers: { ...this.headers },
-      payload: this.payload ? this.payload : undefined,
+      payload: this.payload,
     };
   }
 }

@@ -1,7 +1,7 @@
 import { ParamsMetadata } from "@typedefs/metadata.types";
 import symbols from "@core/constants";
 
-export function Headers(key?: string) {
+export function Headers() {
   return function (target: any, propertyKey: string, paramIndex: number) {
     const metadata: ParamsMetadata = Reflect.getMetadata(
       symbols.paramsArg,

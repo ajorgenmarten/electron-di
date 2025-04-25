@@ -284,7 +284,7 @@ function Global() {
 }
 
 // src/decorators/Headers.ts
-function Headers(key) {
+function Headers() {
   return function(target, propertyKey, paramIndex) {
     var _a;
     const metadata = (_a = Reflect.getMetadata(

@@ -324,6 +324,122 @@ Y si la llamada se hace a `app:bar` se mostraría lo siguiente:
    After all
 ```
 
+## Decorador `@Headers`
+
+El decorador `@Headers` se utiliza para inyectar los encabezados de una solicitud IPC en un parámetro del método del controlador. Este decorador es útil cuando necesitas acceder a información adicional enviada en los encabezados de la solicitud.
+
+### Uso Básico
+
+```typescript
+import { Controller, OnInvoke, Headers } from "electron-di";
+
+@Controller("app")
+class AppController {
+  @OnInvoke("greet")
+  async greet(@Headers() headers: any) {
+    console.log("Headers recibidos:", headers);
+    return `Hello with headers!`;
+  }
+}
+```
+
+## Decorador `@Inject`
+
+El decorador `@Inject` se utiliza para inyectar dependencias específicas en el constructor de una clase. Es especialmente útil cuando necesitas especificar qué implementación concreta debe ser inyectada para una dependencia abstracta.
+
+### Uso Básico
+
+```typescript
+import { Injectable, Inject } from "electron-di";
+
+@Injectable()
+class UserService {
+  constructor(@Inject(DatabaseService) private database: Database) {}
+}
+```
+
+## Decorador `@IPCEvent`
+
+El decorador `@IPCEvent` se utiliza para inyectar el objeto evento IPC de Electron en un parámetro del método del controlador. Este decorador te permite acceder a información del evento IPC como el sender.
+
+### Uso Básico
+
+```typescript
+import { Controller, OnInvoke, IPCEvent } from "electron-di";
+import { IpcMainInvokeEvent } from "electron";
+
+@Controller("app")
+class AppController {
+  @OnInvoke("greet")
+  async greet(@IPCEvent() event: IpcMainInvokeEvent) {
+    console.log("Sender:", event.sender);
+    return `Hello from ${event.sender.id}!`;
+  }
+}
+```
+
+## Decoradores `@OnInvoke` y `@OnSend`
+
+Estos decoradores se utilizan para marcar métodos que manejarán eventos IPC específicos:
+
+- `@OnInvoke`: Para manejar eventos que requieren una respuesta (ipcMain.handle)
+- `@OnSend`: Para manejar eventos unidireccionales (ipcMain.on)
+
+### Uso Básico
+
+```typescript
+import { Controller, OnInvoke, OnSend } from "electron-di";
+
+@Controller("app")
+class AppController {
+  @OnInvoke("greet")
+  async greet() {
+    return "Hello!";
+  }
+
+  @OnSend("notification")
+  handleNotification() {
+    console.log("Notificación recibida");
+  }
+}
+```
+
+## Decorador `@Payload`
+
+El decorador `@Payload` se utiliza para inyectar los datos enviados en la solicitud IPC en un parámetro del método del controlador.
+
+### Uso Básico
+
+```typescript
+import { Controller, OnInvoke, Payload } from "electron-di";
+
+@Controller("app")
+class AppController {
+  @OnInvoke("greet")
+  async greet(@Payload() data: { name: string }) {
+    return `Hello ${data.name}!`;
+  }
+}
+```
+
+## Decorador `@Response`
+
+El decorador `@Response` se utiliza para inyectar el objeto de respuesta en un parámetro del método del controlador, permitiendo un control más granular sobre la respuesta enviada al proceso renderer.
+
+### Uso Básico
+
+```typescript
+import { Controller, OnInvoke, Response } from "electron-di";
+
+@Controller("app")
+class AppController {
+  @OnInvoke("greet")
+  async greet(@Response() res: any) {
+    res.send("Hello!");
+  }
+}
+```
+
 ## Autor
 
 - [ajorgenmarten](https://www.github.com/ajorgenmarten)

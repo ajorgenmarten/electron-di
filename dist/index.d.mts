@@ -120,7 +120,7 @@ declare function Controller(prefix?: string): (target: any) => void;
 
 declare function Global(): (target: Class) => void;
 
-declare function Headers(key?: string): (target: any, propertyKey: string, paramIndex: number) => void;
+declare function Headers(): (target: any, propertyKey: string, paramIndex: number) => void;
 
 declare function Inject(token: Token): (target: any, propertyKey: string | undefined, paramIndex: number) => void;
 

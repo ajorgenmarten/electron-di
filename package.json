@@ -1,6 +1,6 @@
 {
   "name": "electron-di",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "description": "Util para brindar tu aplicación de Electron hecha con npm create electron-vite la capacidad de inyectar dependecias y controladores de IPC",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -23,7 +23,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ajorgenmarten/electron-di.git"
+    "url": "git+https://github.com/ajorgenmarten/electron-di.git"
   },
   "keywords": [
     "electron",
@@ -44,5 +44,9 @@
   },
   "dependencies": {
     "reflect-metadata": "^0.2.2"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "latest"
   }
 }

@@ -165,32 +165,41 @@ class Module implements IModule {
     return this._Class;
   }
   resolve<T>(token: Token<T>): InstanceType<Token<T>> | null {
-    // VERIFICAR SI YA EXISTE LA INSTANCIA
     const instance = this._instances.get(token);
     if (instance) return instance;
-    // VERIFICAR SI EXISTE EL PROVEEDOR O EL CONTROLADOR
-    const resolved =
-      this._providers.find((provider) => provider.Token === token) ||
-      this._controllers.find((controller) => controller.Token === token);
-    if (resolved) {
-      const ResolvedClass = resolved.UseClass;
-      const { constructorArgs }: InjectMetadata = Reflect.getMetadata(
-        symbols.inject,
-        ResolvedClass
-      ) || { constructorArgs: [] };
-      const ResolvedDependencies = constructorArgs.map((dependency) =>
-        this.resolve(dependency)
+
+    try {
+      const resolved =
+        this._providers.find((p) => p.Token === token) ??
+        this._controllers.find((c) => c.Token === token);
+
+      if (resolved) {
+        const ResolvedClass = resolved.UseClass;
+        const { constructorArgs = [] } =
+          Reflect.getMetadata(symbols.inject, ResolvedClass) ?? {};
+
+        const dependencies = (constructorArgs as Token[]).map((dep) => {
+          const resolvedDep = this.resolve(dep);
+          if (!resolvedDep) {
+            throw new Error(`No se pudo resolver la dependencia ${dep.name}`);
+          }
+          return resolvedDep;
+        });
+
+        const resolvedInstance = new ResolvedClass(...dependencies);
+        this._instances.set(token, resolvedInstance);
+        return resolvedInstance;
+      }
+
+      return (
+        this._linkObject.findInGlobalModules(token) ??
+        this._linkObject.findInSharedModules(token, this._imports)
       );
-      const resolvedInstance = new ResolvedClass(...ResolvedDependencies);
-      this._instances.set(token, resolvedInstance);
-      return resolvedInstance;
-    } else {
-      let instance = this._linkObject.findInGlobalModules(token);
-      if (instance) return instance;
-      instance = this._linkObject.findInSharedModules(token, this._imports);
-      if (instance) return instance;
+    } catch (error) {
+      throw new Error(
+        `Error al resolver ${token.name}: ${(error as Error).message}`
+      );
     }
-    return null;
   }
 }
 
@@ -206,30 +215,26 @@ export class Container implements IContainer {
    * @param module Modulo del cual se va a cachear los tokens que son tanto los proveedores como los controladores
    */
   private cacheTokenPath(module: Module) {
-    const getTokens = (components: Component[]) => {
-      return components.map((component) => component.Token);
-    };
-    const tokens = [
-      getTokens(module.Controllers),
-      getTokens(module.Providers),
-    ].flat();
+    const tokens = new Set([
+      ...module.Controllers.map((c) => c.Token),
+      ...module.Providers.map((p) => p.Token),
+    ]);
+
     for (const token of tokens) {
       const cached = this._cache.get(token) ?? [];
-      if (cached.includes(module.Class)) continue;
-      cached.push(module.Class);
-      this._cache.set(token, cached);
+      if (!cached.includes(module.Class)) {
+        cached.push(module.Class);
+        this._cache.set(token, cached);
+      }
     }
   }
   private findInGlobalModules(token: Token) {
-    // VERIFICAR SI EL MODULO AL QUE PERTENECE EL TOKEN ESTA CACHEADO
     const cached = this._cache.get(token);
     if (!cached) return null;
-    const module = this._modules
-      .filter((module) => cached.includes(module.Class))
-      .shift();
-    if (!module) return null;
-    if (!module.IsGlobal) return null;
-    return module.resolve(token);
+    const module = this._modules.find(
+      (module) => cached.includes(module.Class) && module.IsGlobal
+    );
+    return module?.resolve(token) ?? null;
   }
   private findInSharedModules(token: Token, modules: Class[]) {
     // VERIFICAR SI EL MODULO AL QUE PERTENECE EL TOKEN ESTA CACHEADO

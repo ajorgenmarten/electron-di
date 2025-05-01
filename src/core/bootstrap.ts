@@ -1,8 +1,12 @@
 import { ipcMain, IpcMainEvent, IpcMainInvokeEvent } from "electron";
 import symbols from "./constants";
 import { Container } from "./container";
-import { IController } from "../types/container.types";
-import { Class, IMiddleware, IRequest } from "../types/general.types";
+import {
+  Class,
+  IMiddleware,
+  IRequest,
+  IMiddlewareContext,
+} from "../types/general.types";
 import { Logger } from "./logger";
 import {
   IPCMethodMetadata,
@@ -14,226 +18,278 @@ import {
   Response as ElectronDIResponse,
 } from "./params";
 
-export function Bootstrap(module: Class) {
+class MetadataManager {
+  static getMethodMetadata(
+    instance: InstanceType<Class>,
+    method: string
+  ): IPCMethodMetadata {
+    return Reflect.getMetadata(symbols.ipcmethod, instance, method);
+  }
+
+  static getParamsMetadata(
+    instance: InstanceType<Class>,
+    method: string
+  ): ParamsMetadata {
+    return (
+      Reflect.getMetadata(symbols.paramsArg, instance, method) ?? { params: [] }
+    );
+  }
+
+  static getMethodMiddlewaresMetadata(
+    instance: InstanceType<Class>,
+    method: string
+  ): MiddlewareMetadata {
+    return (
+      Reflect.getMetadata(symbols.middlewares, instance, method) ?? {
+        middlewares: [],
+      }
+    );
+  }
+}
+
+class MiddlewareHandler {
+  static async executeBeforeMiddlewares(
+    middlewares: IMiddleware<"Before">[],
+    context: IMiddlewareContext
+  ): Promise<boolean> {
+    if (!middlewares || !Array.isArray(middlewares)) {
+      Logger.warn("Middlewares Before no es un array válido");
+      return true;
+    }
+    try {
+      for (const middleware of middlewares) {
+        const params = this.resolveMiddlewareParams(middleware, context);
+        const result = await middleware.excecute(...params);
+        if (result === false) return false;
+      }
+      return true;
+    } catch (error) {
+      Logger.error(`Error en middleware Before: ${(error as Error).message}`);
+      return false;
+    }
+  }
+
+  static async executeAfterMiddlewares(
+    middlewares: IMiddleware<"After">[],
+    context: IMiddlewareContext
+  ): Promise<void> {
+    const promises = middlewares.map((middleware) => {
+      const params = this.resolveMiddlewareParams(middleware, context);
+      return middleware.excecute(...params);
+    });
+    await Promise.all(promises);
+  }
+
+  private static resolveMiddlewareParams(
+    middleware: IMiddleware<any>,
+    context: IMiddlewareContext
+  ): any[] {
+    const metadata = MetadataManager.getParamsMetadata(middleware, "excecute");
+    return ParamsResolver.resolveParams(metadata, context);
+  }
+}
+
+class ParamsResolver {
+  static resolveParams(
+    { params }: ParamsMetadata,
+    context: IMiddlewareContext
+  ): any[] {
+    return params.map((param) => {
+      switch (param.type) {
+        case "IpcEvent":
+          return context.event;
+        case "Request":
+          return context.request;
+        case "Headers":
+          return context.request.headers;
+        case "Payload":
+          return context.request.payload;
+        case "Response":
+          return context.response;
+        default:
+          return undefined;
+      }
+    });
+  }
+}
+
+class IPCHandler {
+  private static async handleRequest(
+    instance: InstanceType<Class>,
+    method: string,
+    context: IMiddlewareContext,
+    middlewares: {
+      before: IMiddleware<"Before">[];
+      after: IMiddleware<"After">[];
+    }
+  ): Promise<IRequest> {
+    try {
+      const beforeResult = await MiddlewareHandler.executeBeforeMiddlewares(
+        middlewares.before,
+        context
+      );
+
+      if (!beforeResult) {
+        return {
+          headers: { success: "false" },
+          payload: { error: "Falló la ejecución de middlewares Before" },
+        };
+      }
+
+      const params = ParamsResolver.resolveParams(
+        MetadataManager.getParamsMetadata(instance, method),
+        context
+      );
+
+      const result = await instance[method](...params);
+      const response = this.formatResponse(result, context.response);
+
+      await MiddlewareHandler.executeAfterMiddlewares(
+        middlewares.after,
+        context
+      );
+
+      return response;
+    } catch (error) {
+      Logger.error(`Error en el manejador IPC: ${(error as Error).message}`);
+      return {
+        headers: { success: "false" },
+        payload: {
+          error: (error as Error).message,
+          stack:
+            process.env.NODE_ENV === "development"
+              ? (error as Error).stack
+              : undefined,
+        },
+      };
+    }
+  }
+
+  private static formatResponse(
+    result: any,
+    response: ElectronDIResponse
+  ): IRequest {
+    if (typeof result === "undefined") return response.toPlainObject();
+    if (result instanceof ElectronDIResponse) return result.toPlainObject();
+    return response.send(result).toPlainObject();
+  }
+
+  static registerHandler(
+    channel: string,
+    instance: InstanceType<Class>,
+    method: string,
+    type: "invoke" | "send",
+    middlewares: {
+      before: IMiddleware<"Before">[];
+      after: IMiddleware<"After">[];
+    }
+  ): void {
+    if (!channel || typeof channel !== "string") {
+      throw new Error("El channel debe ser un string válido");
+    }
+
+    if (ipcMain.listeners(channel).length > 0) {
+      Logger.warn(
+        `Ya existe un handler registrado para el channel: ${channel}`
+      );
+      return;
+    }
+
+    const handler = async (
+      event: IpcMainInvokeEvent | IpcMainEvent,
+      ...args: any[]
+    ): Promise<IRequest> => {
+      const context: IMiddlewareContext = {
+        request: new ElectronDIRequest(args[0]).toPlainObject(),
+        response: new ElectronDIResponse(),
+        event,
+      };
+
+      return this.handleRequest(instance, method, context, middlewares);
+    };
+
+    type === "invoke"
+      ? ipcMain.handle(channel, handler)
+      : ipcMain.on(channel, handler);
+  }
+}
+
+/**
+ * Inicializa la aplicación Electron con el módulo principal.
+ * Registra todos los controladores y middlewares definidos en el módulo.
+ *
+ * @param module - El módulo principal de la aplicación
+ * @throws {Error} Si el módulo no está correctamente configurado
+ *
+ * @example
+ * Bootstrap(AppModule);
+ */
+export function Bootstrap(module: Class): void {
   const container = new Container();
   container.registerModule(module);
 
-  const getControllerMiddlewaresInfo = (controller: IController) => {
-    return controller.Middlewares.map((middlewareMetadata) => {
-      const middlewareInstance = container.resolve(middlewareMetadata.Token);
-      const middlewareType = middlewareMetadata.Type;
-      return { middlewareInstance, middlewareType };
-    });
-  };
+  const controllers = container.Modules.flatMap(
+    (module) => module.Controllers
+  ).map((controller) => ({
+    instance: container.resolve(controller.Token),
+    prefix: controller.Prefix.trim(),
+    middlewares: controller.Middlewares.map((m) => ({
+      instance: container.resolve(m.Token),
+      type: m.Type,
+    })),
+  }));
 
-  const getControllersInfo = (container: Container) => {
-    return container.Modules.map((module) => module.Controllers)
-      .flat()
-      .map((controller) => {
-        const instance = container.resolve(controller.Token);
-        const prefix = controller.Prefix.trim();
-        const middlewares = getControllerMiddlewaresInfo(controller);
-        return { instance, prefix, middlewares };
-      });
-  };
-
-  const getMethodNamesFromInstance = (instance: InstanceType<Class>) => {
-    const prototype = Object.getPrototypeOf(instance);
-    return Object.getOwnPropertyNames(prototype).filter((methodName) => {
-      return (
-        typeof prototype[methodName] === "function" &&
-        methodName !== "constructor"
-      );
-    });
-  };
-
-  const getMethodMetadata = (instance: InstanceType<Class>, method: string) => {
-    const methodMetadata: IPCMethodMetadata = Reflect.getMetadata(
-      symbols.ipcmethod,
-      instance,
-      method
+  for (const controller of controllers) {
+    const methods = Object.getOwnPropertyNames(
+      Object.getPrototypeOf(controller.instance)
+    ).filter(
+      (name) =>
+        name !== "constructor" &&
+        typeof controller.instance[name] === "function"
     );
-    return methodMetadata;
-  };
 
-  const getParamsMetadata = (instance: InstanceType<Class>, method: string) => {
-    const paramsMetadata: ParamsMetadata = Reflect.getMetadata(
-      symbols.paramsArg,
-      instance,
-      method
-    ) ?? { params: [] };
-    return paramsMetadata;
-  };
-
-  const getMethodMiddlewaresMetadata = (
-    instance: InstanceType<Class>,
-    method: string
-  ) => {
-    const middlewaresMetadata: MiddlewareMetadata = Reflect.getMetadata(
-      symbols.middlewares,
-      instance,
-      method
-    ) ?? { middlewares: [] };
-    return middlewaresMetadata;
-  };
-
-  const resolveParams = (
-    { params }: ParamsMetadata,
-    request: IRequest,
-    response: ElectronDIResponse,
-    event: IpcMainInvokeEvent | IpcMainEvent
-  ) => {
-    return params.map((param) => {
-      if (param.type === "IpcEvent") return event;
-      if (param.type === "Request") return request;
-      if (param.type === "Headers") return request.headers;
-      if (param.type === "Payload") return request.payload;
-      if (param.type === "Response") return response;
-      return undefined;
-    });
-  };
-
-  const groupBy = <T, M>(array: T[], key: keyof T, mapper?: (item: T) => M) => {
-    const resultRecord: Record<string, (T | M)[]> = {};
-    for (const item of array) {
-      const value = item[key];
-      if ((value as string) in resultRecord) {
-        resultRecord[value as string].push(
-          typeof mapper === "function" ? mapper(item) : item
-        );
-      } else {
-        resultRecord[value as string] = [
-          typeof mapper === "function" ? mapper(item) : item,
-        ];
-      }
-    }
-    return resultRecord;
-  };
-
-  const applyBeforeMiddlewares = async (
-    middlewares: IMiddleware<"Before">[],
-    request: IRequest,
-    response: ElectronDIResponse,
-    event: IpcMainInvokeEvent | IpcMainEvent
-  ) => {
-    for (const middleware of middlewares) {
-      const middlewareParamsMetadata: ParamsMetadata = getParamsMetadata(
-        middleware,
-        "excecute"
-      );
-      const middlewareParams = resolveParams(
-        middlewareParamsMetadata,
-        request,
-        response,
-        event
-      );
-      const res = await middleware.excecute(...middlewareParams);
-      if (res === false) return false;
-    }
-    return true;
-  };
-
-  const applyAfterMiddlewares = async (
-    middlewares: IMiddleware<"After">[],
-    request: IRequest,
-    response: ElectronDIResponse,
-    event: IpcMainInvokeEvent | IpcMainEvent
-  ) => {
-    const excecutedMiddlewares: (Promise<void> | void)[] = [];
-    for (const middleware of middlewares) {
-      const middlewareParams = getParamsMetadata(middleware, "excecute");
-      const resolvedParams = resolveParams(
-        middlewareParams,
-        request,
-        response,
-        event
-      );
-      excecutedMiddlewares.push(middleware.excecute(...resolvedParams));
-    }
-    await Promise.all(excecutedMiddlewares);
-  };
-
-  const controllersInfo = getControllersInfo(container);
-
-  for (const { instance, prefix, middlewares } of controllersInfo) {
-    const instanceMethdoNames = getMethodNamesFromInstance(instance);
-    for (const method of instanceMethdoNames) {
-      const methodMetadata = getMethodMetadata(instance, method);
-      const paramsMetadata = getParamsMetadata(instance, method);
-      const methodMiddlewaresMetadata = getMethodMiddlewaresMetadata(
-        instance,
+    for (const method of methods) {
+      const metadata = MetadataManager.getMethodMetadata(
+        controller.instance,
         method
       );
+      if (!metadata) continue;
 
-      if (!methodMetadata) continue;
-      const methodChannel = methodMetadata.channel.trim();
-      const channel = prefix ? `${prefix}:${methodChannel}` : methodChannel;
+      const channel = controller.prefix
+        ? `${controller.prefix}:${metadata.channel.trim()}`
+        : metadata.channel.trim();
 
-      const listener = async (
-        event: IpcMainInvokeEvent | IpcMainEvent,
-        ...args: any[]
-      ): Promise<IRequest> => {
-        const request = new ElectronDIRequest(args[0]).toPlainObject();
-        const response = new ElectronDIResponse();
-        const params = resolveParams(paramsMetadata, request, response, event);
-        const methodMiddlewares = groupBy(
-          methodMiddlewaresMetadata.middlewares,
-          "type",
-          (middleware) => container.resolve(middleware.token)
-        );
-        const controllerMiddlewares = groupBy(
-          middlewares,
-          "middlewareType",
-          (middleware) => middleware.middlewareInstance
-        );
-        const beforeMiddlewares = [
-          ...(controllerMiddlewares.Before ?? []).reverse(),
-          ...(methodMiddlewares.Before ?? []).reverse(),
-        ];
-        const afterMiddlewares = [
-          ...(controllerMiddlewares.After ?? []).reverse(),
-          ...(methodMiddlewares.After ?? []).reverse(),
-        ];
-        try {
-          const beforeMiddlewaresResult = await applyBeforeMiddlewares(
-            beforeMiddlewares,
-            request,
-            response,
-            event
-          );
-          if (beforeMiddlewaresResult === false)
-            return {
-              headers: { success: "false" },
-              payload: { error: "Before middlewares failed" },
-            };
-        } catch (error) {
-          Logger.error(
-            (error as Error).message ?? "Unknown error",
-            (error as Error).name
-          );
-          return {
-            headers: { success: "false" },
-            payload: { error: (error as Error).message ?? error },
-          };
-        }
-        const responseController = await instance[method](...params);
-        const toresponse =
-          typeof responseController === "undefined"
-            ? response.toPlainObject()
-            : responseController instanceof ElectronDIResponse
-              ? responseController.toPlainObject()
-              : response.send(responseController).toPlainObject();
+      const methodMiddlewares = MetadataManager.getMethodMiddlewaresMetadata(
+        controller.instance,
+        method
+      ).middlewares;
 
-        await applyAfterMiddlewares(afterMiddlewares, request, response, event);
-
-        return toresponse;
+      const middlewares = {
+        before: [
+          ...controller.middlewares
+            .filter((m) => m.type === "Before")
+            .map((m) => m.instance),
+          ...methodMiddlewares
+            .filter((m) => m.type === "Before")
+            .map((m) => container.resolve(m.token)),
+        ].reverse(),
+        after: [
+          ...controller.middlewares
+            .filter((m) => m.type === "After")
+            .map((m) => m.instance),
+          ...methodMiddlewares
+            .filter((m) => m.type === "After")
+            .map((m) => container.resolve(m.token)),
+        ].reverse(),
       };
 
-      if (methodMetadata.type === "invoke") {
-        ipcMain.handle(channel, listener);
-      } else if (methodMetadata.type === "send") {
-        ipcMain.on(channel, listener);
-      }
+      IPCHandler.registerHandler(
+        channel,
+        controller.instance,
+        method,
+        metadata.type,
+        middlewares
+      );
     }
   }
 }

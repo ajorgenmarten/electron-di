@@ -17,10 +17,9 @@ export class Request<T = any> {
       throw new Error(
         "Headers debe ser un objeto de tipo Record<string, string>"
       );
-    const claves = Object.keys(headers);
 
-    for (const clave of claves) {
-      if (typeof clave !== "string" || typeof headers[clave] !== "string")
+    for (const [clave, valor] of Object.entries(headers)) {
+      if (typeof clave !== "string" || typeof valor !== "string")
         throw new Error(
           "Headers debe ser un objeto de tipo Record<string, string>"
         );

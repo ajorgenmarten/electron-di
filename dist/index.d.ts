@@ -122,7 +122,13 @@ declare function Global(): (target: Class) => void;
 
 declare function Headers(): (target: any, propertyKey: string, paramIndex: number) => void;
 
-declare function Inject(token: Token): (target: any, propertyKey: string | undefined, paramIndex: number) => void;
+/**
+ * Decorador para inyección de dependencias en parámetros del constructor.
+ * @template T - Tipo del token a inyectar
+ * @param token - Token que representa la dependencia a inyectar
+ * @returns Decorador de parámetro
+ */
+declare function Inject<T>(token: Token<T>): ParameterDecorator;
 
 declare function Injectable(): (target: Class) => void;
 

@@ -34,3 +34,9 @@ export type MiddlewareFunction<T> = (args: any[]) => MiddlewareReturnType<T>;
 export type IMiddleware<T = "Before" | "After"> = {
   excecute(...args: any[]): MiddlewareReturnType<T>;
 };
+
+interface IMiddlewareContext {
+  request: IRequest;
+  response: ElectronDIResponse;
+  event: IpcMainInvokeEvent | IpcMainEvent;
+}

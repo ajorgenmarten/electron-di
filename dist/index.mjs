@@ -498,28 +498,31 @@ var Module2 = class {
     return this._Class;
   }
   resolve(token) {
+    var _a, _b, _c;
     const instance = this._instances.get(token);
     if (instance) return instance;
-    const resolved = this._providers.find((provider) => provider.Token === token) || this._controllers.find((controller2) => controller2.Token === token);
-    if (resolved) {
-      const ResolvedClass = resolved.UseClass;
-      const { constructorArgs } = Reflect.getMetadata(
-        constants_default.inject,
-        ResolvedClass
-      ) || { constructorArgs: [] };
-      const ResolvedDependencies = constructorArgs.map(
-        (dependency) => this.resolve(dependency)
+    try {
+      const resolved = (_a = this._providers.find((p) => p.Token === token)) != null ? _a : this._controllers.find((c) => c.Token === token);
+      if (resolved) {
+        const ResolvedClass = resolved.UseClass;
+        const { constructorArgs = [] } = (_b = Reflect.getMetadata(constants_default.inject, ResolvedClass)) != null ? _b : {};
+        const dependencies = constructorArgs.map((dep) => {
+          const resolvedDep = this.resolve(dep);
+          if (!resolvedDep) {
+            throw new Error(`No se pudo resolver la dependencia ${dep.name}`);
+          }
+          return resolvedDep;
+        });
+        const resolvedInstance = new ResolvedClass(...dependencies);
+        this._instances.set(token, resolvedInstance);
+        return resolvedInstance;
+      }
+      return (_c = this._linkObject.findInGlobalModules(token)) != null ? _c : this._linkObject.findInSharedModules(token, this._imports);
+    } catch (error) {
+      throw new Error(
+        `Error al resolver ${token.name}: ${error.message}`
       );
-      const resolvedInstance = new ResolvedClass(...ResolvedDependencies);
-      this._instances.set(token, resolvedInstance);
-      return resolvedInstance;
-    } else {
-      let instance2 = this._linkObject.findInGlobalModules(token);
-      if (instance2) return instance2;
-      instance2 = this._linkObject.findInSharedModules(token, this._imports);
-      if (instance2) return instance2;
     }
-    return null;
   }
 };
 var Container = class {
@@ -536,27 +539,26 @@ var Container = class {
    */
   cacheTokenPath(module2) {
     var _a;
-    const getTokens = (components) => {
-      return components.map((component) => component.Token);
-    };
-    const tokens = [
-      getTokens(module2.Controllers),
-      getTokens(module2.Providers)
-    ].flat();
+    const tokens = /* @__PURE__ */ new Set([
+      ...module2.Controllers.map((c) => c.Token),
+      ...module2.Providers.map((p) => p.Token)
+    ]);
     for (const token of tokens) {
       const cached = (_a = this._cache.get(token)) != null ? _a : [];
-      if (cached.includes(module2.Class)) continue;
-      cached.push(module2.Class);
-      this._cache.set(token, cached);
+      if (!cached.includes(module2.Class)) {
+        cached.push(module2.Class);
+        this._cache.set(token, cached);
+      }
     }
   }
   findInGlobalModules(token) {
+    var _a;
     const cached = this._cache.get(token);
     if (!cached) return null;
-    const module2 = this._modules.filter((module3) => cached.includes(module3.Class)).shift();
-    if (!module2) return null;
-    if (!module2.IsGlobal) return null;
-    return module2.resolve(token);
+    const module2 = this._modules.find(
+      (module3) => cached.includes(module3.Class) && module3.IsGlobal
+    );
+    return (_a = module2 == null ? void 0 : module2.resolve(token)) != null ? _a : null;
   }
   findInSharedModules(token, modules) {
     const cached = this._cache.get(token);
@@ -613,9 +615,8 @@ var Request2 = class {
       throw new Error(
         "Headers debe ser un objeto de tipo Record<string, string>"
       );
-    const claves = Object.keys(headers);
-    for (const clave of claves) {
-      if (typeof clave !== "string" || typeof headers[clave] !== "string")
+    for (const [clave, valor] of Object.entries(headers)) {
+      if (typeof clave !== "string" || typeof valor !== "string")
         throw new Error(
           "Headers debe ser un objeto de tipo Record<string, string>"
         );
@@ -687,6 +688,10 @@ var MetadataManager = class {
 var MiddlewareHandler = class {
   static executeBeforeMiddlewares(middlewares2, context) {
     return __async(this, null, function* () {
+      if (!middlewares2 || !Array.isArray(middlewares2)) {
+        Logger.warn("Middlewares Before no es un array v\xE1lido");
+        return true;
+      }
       try {
         for (const middleware of middlewares2) {
           const params = this.resolveMiddlewareParams(middleware, context);
@@ -737,7 +742,6 @@ var ParamsResolver = class {
 var IPCHandler = class {
   static handleRequest(instance, method, context, middlewares2) {
     return __async(this, null, function* () {
-      var _a, _b;
       try {
         const beforeResult = yield MiddlewareHandler.executeBeforeMiddlewares(
           middlewares2.before,
@@ -761,10 +765,13 @@ var IPCHandler = class {
         );
         return response;
       } catch (error) {
-        Logger.error((_a = error.message) != null ? _a : "Error desconocido");
+        Logger.error(`Error en el manejador IPC: ${error.message}`);
         return {
           headers: { success: "false" },
-          payload: { error: (_b = error.message) != null ? _b : "Error desconocido" }
+          payload: {
+            error: error.message,
+            stack: process.env.NODE_ENV === "development" ? error.stack : void 0
+          }
         };
       }
     });
@@ -775,6 +782,15 @@ var IPCHandler = class {
     return response.send(result).toPlainObject();
   }
   static registerHandler(channel, instance, method, type, middlewares2) {
+    if (!channel || typeof channel !== "string") {
+      throw new Error("El channel debe ser un string v\xE1lido");
+    }
+    if (ipcMain.listeners(channel).length > 0) {
+      Logger.warn(
+        `Ya existe un handler registrado para el channel: ${channel}`
+      );
+      return;
+    }
     const handler = (event, ...args) => __async(this, null, function* () {
       const context = {
         request: new Request2(args[0]).toPlainObject(),

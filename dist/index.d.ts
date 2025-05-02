@@ -107,7 +107,7 @@ type MiddlewareReturnType<T = "Before" | "After"> = T extends "After"
   ? Promise<void> | void
   : Promise<boolean> | boolean;
 type IMiddleware<T = "Before" | "After"> = {
-  excecute(...args: any[]): MiddlewareReturnType<T>;
+  execute(...args: any[]): MiddlewareReturnType<T>;
 };
 
 /**

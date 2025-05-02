@@ -32,7 +32,7 @@ type MiddlewareReturnType<T = "Before" | "After"> = T extends "After"
   : Promise<boolean> | boolean;
 export type MiddlewareFunction<T> = (args: any[]) => MiddlewareReturnType<T>;
 export type IMiddleware<T = "Before" | "After"> = {
-  excecute(...args: any[]): MiddlewareReturnType<T>;
+  execute(...args: any[]): MiddlewareReturnType<T>;
 };
 
 interface IMiddlewareContext {

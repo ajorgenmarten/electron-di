@@ -59,7 +59,7 @@ class MiddlewareHandler {
     try {
       for (const middleware of middlewares) {
         const params = this.resolveMiddlewareParams(middleware, context);
-        const result = await middleware.excecute(...params);
+        const result = await middleware.execute(...params);
         if (result === false) return false;
       }
       return true;
@@ -75,7 +75,7 @@ class MiddlewareHandler {
   ): Promise<void> {
     const promises = middlewares.map((middleware) => {
       const params = this.resolveMiddlewareParams(middleware, context);
-      return middleware.excecute(...params);
+      return middleware.execute(...params);
     });
     await Promise.all(promises);
   }
@@ -84,7 +84,7 @@ class MiddlewareHandler {
     middleware: IMiddleware<any>,
     context: IMiddlewareContext
   ): any[] {
-    const metadata = MetadataManager.getParamsMetadata(middleware, "excecute");
+    const metadata = MetadataManager.getParamsMetadata(middleware, "execute");
     return ParamsResolver.resolveParams(metadata, context);
   }
 }
@@ -144,10 +144,16 @@ class IPCHandler {
       const result = await instance[method](...params);
       const response = this.formatResponse(result, context.response);
 
-      await MiddlewareHandler.executeAfterMiddlewares(
+      MiddlewareHandler.executeAfterMiddlewares(
         middlewares.after,
         context
-      );
+      ).catch((error) => {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Ha ocurrido un error en el manejador IPC para un middleware After";
+        Logger.error(errorMessage, "ELECTRON DI");
+      });
 
       return response;
     } catch (error) {
@@ -155,7 +161,11 @@ class IPCHandler {
       return {
         headers: { success: "false" },
         payload: {
-          error: (error as Error).message,
+          data: error instanceof Error == false ? error : undefined,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Ha ocurrido un error en el manejador IPC",
           stack:
             process.env.NODE_ENV === "development"
               ? (error as Error).stack

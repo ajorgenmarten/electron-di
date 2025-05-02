@@ -10,7 +10,6 @@ import {
   ControllerMetadata,
   GlobalMetadata,
   InjectableMetadata,
-  InjectMetadata,
   IProvider,
   ItemMiddlewareMetadata,
   MiddlewareMetadata,

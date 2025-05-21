@@ -3,7 +3,6 @@ export * from "./Before";
 export * from "./Payload";
 export * from "./Controller";
 export * from "./Global";
-export * from "./Headers";
 export * from "./Inject";
 export * from "./Injectable";
 export * from "./IPCEvent";

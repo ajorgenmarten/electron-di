@@ -254,17 +254,6 @@ class StockMovementController {
 }
 ```
 
-## `@Headers` Decorator
-
-Injects IPC request headers into a controller method parameter.
-
-```ts
-@OnInvoke("greet")
-async greet(@Headers() headers: any) {
-  console.log("Received headers:", headers);
-}
-```
-
 ## `@Inject` Decorator
 
 Injects specific dependencies into a class constructor.
@@ -326,7 +315,7 @@ async greet(@Response() res: any) {
 
 ## Comunicación desde el proceso renderer
 
-La comunicación desde el proceso renderer se realiza mediante la función `ipcRenderer.invoke` de Electron o `ipcRenderer.send` para enviar un mensaje a un método del controlador. los datos deben enviarse a través de un objeto que contiene las claves `headers` y `payload`.
+La comunicación desde el proceso renderer se realiza mediante la función `ipcRenderer.invoke` de Electron o `ipcRenderer.send` para enviar un mensaje a un método del controlador.
 
 ```ts
 // In the renderer process...

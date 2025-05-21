@@ -75,40 +75,23 @@ declare class Logger {
 }
 
 type Class<T = any> = new (...args: any[]) => T;
+
 type AbstractClass<T = any> = abstract new (...args: any[]) => T;
+
 type Token<T = any> = Class<T> | AbstractClass<T>;
-type Headers$1 = Record<string, string>;
-type Payload$1<T = any> = T;
-interface IRequest<T = any> {
-  headers?: Headers$1;
-  payload?: Payload$1<T>;
-}
-interface IResponse<T = any> {
-  get Payload(): Payload$1<T> | undefined;
-  get Headers(): Headers$1;
-  /**
-   * Función para agregar o modificar una cabecera de la respuesta
-   * @param key clave de la cabecera que se va a agregar, modificar o eliminar
-   * @param value valor de la clave de la cebecera, si es undefined se elimina la cabecera
-   * @returns {Response} la misma instancia de la clase Response
-   */
-  header(
-    key: string,
-    value: string | number | boolean | undefined
-  ): IResponse<T>;
-  /**
-   * Función para establecer el payload de la respuesta
-   * @param payload Estable el payload de la respuesta
-   * @returns
-   */
-  send(payload: T): IRespnse<T>;
-}
+
 type MiddlewareReturnType<T = "Before" | "After"> = T extends "After"
   ? Promise<void> | void
   : Promise<boolean> | boolean;
+
 type IMiddleware<T = "Before" | "After"> = {
   execute(...args: any[]): MiddlewareReturnType<T>;
 };
+
+interface IRequest<PayloadDataType = any> {
+  Event: IpcMainInvokeEvent | IpcMainEvent;
+  Payload?: PayloadDataType | undefined;
+}
 
 /**
  * Decorador que registra un middleware "After" para ser ejecutado después de un método o clase.
@@ -218,24 +201,6 @@ declare function Controller(prefix?: string): (target: any) => void;
  * @returns {Function} Decorador que puede ser aplicado a una clase
  */
 declare function Global(): (target: Class) => void;
-
-/**
- * Decorador que permite inyectar los headers de la petición IPC en un parámetro del método.
- *
- * @example
- * ```typescript
- * |@Controller()
- * class MyController {
- *   |@OnInvoke('my-event')
- *   handleRequest(@Headers() headers: any) {
- *     // Los headers estarán disponibles aquí
- *   }
- * }
- * ```
- *
- * @returns Decorador de parámetro que marca el argumento para recibir los headers
- */
-declare function Headers(): (target: any, propertyKey: string, paramIndex: number) => void;
 
 /**
  * Decorador para inyección de dependencias en parámetros del constructor.
@@ -407,4 +372,4 @@ declare function Response(): (target: any, propertyKey: string, paramIndex: numb
  */
 declare function Bootstrap(module: Class): void;
 
-export { After, Before, Bootstrap, Controller, Global, Headers, type IMiddleware, IPCEvent, type IRequest, type IResponse, Inject, Injectable, Logger, Module, OnInvoke, OnSend, Payload, Request, Response };
+export { After, Before, Bootstrap, Controller, Global, type IMiddleware, IPCEvent, type IRequest, Inject, Injectable, Logger, Module, OnInvoke, OnSend, Payload, Request, Response };

@@ -2,21 +2,7 @@
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getOwnPropSymbols = Object.getOwnPropertySymbols;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __propIsEnum = Object.prototype.propertyIsEnumerable;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __spreadValues = (a, b) => {
-  for (var prop in b || (b = {}))
-    if (__hasOwnProp.call(b, prop))
-      __defNormalProp(a, prop, b[prop]);
-  if (__getOwnPropSymbols)
-    for (var prop of __getOwnPropSymbols(b)) {
-      if (__propIsEnum.call(b, prop))
-        __defNormalProp(a, prop, b[prop]);
-    }
-  return a;
-};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -59,7 +45,6 @@ __export(index_exports, {
   Bootstrap: () => Bootstrap,
   Controller: () => Controller,
   Global: () => Global,
-  Headers: () => Headers,
   IPCEvent: () => IPCEvent,
   Inject: () => Inject,
   Injectable: () => Injectable,
@@ -280,20 +265,6 @@ function Global() {
   return function(target) {
     const metadata = true;
     Reflect.defineMetadata(constants_default.global, metadata, target);
-  };
-}
-
-// src/decorators/Headers.ts
-function Headers() {
-  return function(target, propertyKey, paramIndex) {
-    var _a;
-    const metadata = (_a = Reflect.getMetadata(
-      constants_default.paramsArg,
-      target,
-      propertyKey
-    )) != null ? _a : { params: [] };
-    metadata.params[paramIndex] = { type: "Headers" };
-    Reflect.defineMetadata(constants_default.paramsArg, metadata, target, propertyKey);
   };
 }
 
@@ -639,73 +610,42 @@ var Container = class {
 
 // src/core/params.ts
 var Request2 = class {
-  constructor(argument) {
-    this.headers = {};
-    this.payload = void 0;
-    this.headers = this.validateHeaders(argument == null ? void 0 : argument.headers);
-    this.payload = argument == null ? void 0 : argument.payload;
-  }
-  validateHeaders(headers) {
-    if (typeof headers === "undefined") return {};
-    if (typeof headers !== "object")
-      throw new Error(
-        "Headers debe ser un objeto de tipo Record<string, string>"
-      );
-    for (const [clave, valor] of Object.entries(headers)) {
-      if (typeof clave !== "string" || typeof valor !== "string")
-        throw new Error(
-          "Headers debe ser un objeto de tipo Record<string, string>"
-        );
-    }
-    return headers;
-  }
-  toPlainObject() {
-    return {
-      headers: __spreadValues({}, this.headers),
-      payload: this.payload ? this.payload : void 0
-    };
-  }
-};
-var Response2 = class {
-  constructor() {
-    this.headers = {};
-    this.payload = void 0;
-  }
-  /**
-   * Función para agregar o modificar una cabecera de la respuesta
-   * @param key clave de la cabecera que se va a agregar, modificar o eliminar
-   * @param value valor de la clave de la cebecera, si es undefined se elimina la cabecera
-   * @returns {Response} la misma instancia de la clase Response
-   */
-  header(key, value) {
-    if (typeof value === "undefined") delete this.headers[key];
-    else this.headers[key] = value.toString();
-    return this;
-  }
-  /**
-   * Función para establecer el payload de la respuesta
-   * @param payload Estable el payload de la respuesta
-   * @returns
-   */
-  send(payload) {
+  constructor(event, payload) {
+    this.event = event;
     this.payload = payload;
-    return this;
+  }
+  get Event() {
+    return this.event;
   }
   get Payload() {
     return this.payload;
   }
-  get Headers() {
-    return this.headers;
+  set Payload(value) {
+    this.payload = value;
   }
-  toPlainObject() {
-    return {
-      headers: __spreadValues({}, this.headers),
-      payload: this.payload
-    };
+};
+var Response2 = class {
+  constructor() {
+    this.responseData = void 0;
+  }
+  send(payload) {
+    this.responseData = payload;
+  }
+  get Data() {
+    return typeof this.responseData === "undefined" ? void 0 : JSON.parse(JSON.stringify(this.responseData));
+  }
+  set Data(data) {
+    this.responseData = data;
   }
 };
 
 // src/core/bootstrap.ts
+var IPCError = class extends Error {
+  constructor(data) {
+    super(data.message);
+    this.details = data.details;
+  }
+};
 var MetadataManager = class {
   static getMethodMetadata(instance, method) {
     return Reflect.getMetadata(constants_default.ipcmethod, instance, method);
@@ -725,20 +665,20 @@ var MiddlewareHandler = class {
   static executeBeforeMiddlewares(middlewares2, context) {
     return __async(this, null, function* () {
       if (!middlewares2 || !Array.isArray(middlewares2)) {
-        Logger.warn("Middlewares Before no es un array v\xE1lido");
-        return true;
+        const message = "Middlewares Before no es un array v\xE1lido";
+        Logger.warn(message);
+        return { success: false, reason: message };
       }
-      try {
-        for (const middleware of middlewares2) {
-          const params = this.resolveMiddlewareParams(middleware, context);
-          const result = yield middleware.execute(...params);
-          if (result === false) return false;
-        }
-        return true;
-      } catch (error) {
-        Logger.error(`Error en middleware Before: ${error.message}`);
-        return false;
+      for (const middleware of middlewares2) {
+        const params = this.resolveMiddlewareParams(middleware, context);
+        const result = yield middleware.execute(...params);
+        if (!result)
+          return {
+            success: false,
+            reason: `Middleware ${middleware.constructor.name} ha retornado "false".`
+          };
       }
+      return { success: true };
     });
   }
   static executeAfterMiddlewares(middlewares2, context) {
@@ -760,13 +700,11 @@ var ParamsResolver = class {
     return params.map((param) => {
       switch (param.type) {
         case "IpcEvent":
-          return context.event;
+          return context.request.Event;
         case "Request":
           return context.request;
-        case "Headers":
-          return context.request.headers;
         case "Payload":
-          return context.request.payload;
+          return context.request.Payload;
         case "Response":
           return context.response;
         default:
@@ -776,50 +714,62 @@ var ParamsResolver = class {
   }
 };
 var IPCHandler = class {
+  static handleError(error) {
+    if (error instanceof IPCError) {
+      return {
+        success: false,
+        reason: error.message,
+        details: error.details
+      };
+    }
+    Logger.error(error.message || "Internal Error", "ELECTRON DI");
+    return {
+      success: false,
+      reason: "Internal Error",
+      details: error
+    };
+  }
   static handleRequest(instance, method, context, middlewares2) {
     return __async(this, null, function* () {
+      var _a;
       try {
         const beforeResult = yield MiddlewareHandler.executeBeforeMiddlewares(
           middlewares2.before,
           context
         );
-        if (!beforeResult) {
-          return {
-            headers: { success: "false" },
-            payload: { error: "Fall\xF3 la ejecuci\xF3n de middlewares Before" }
-          };
+        if (!beforeResult.success) {
+          Logger.error((_a = beforeResult.reason) != null ? _a : "Un middleware no se ha cumplido");
+          return beforeResult;
         }
-        const params = ParamsResolver.resolveParams(
-          MetadataManager.getParamsMetadata(instance, method),
-          context
-        );
+      } catch (error) {
+        return this.handleError(error);
+      }
+      const params = ParamsResolver.resolveParams(
+        MetadataManager.getParamsMetadata(instance, method),
+        context
+      );
+      try {
         const result = yield instance[method](...params);
         const response = this.formatResponse(result, context.response);
         MiddlewareHandler.executeAfterMiddlewares(
           middlewares2.after,
           context
         ).catch((error) => {
-          const errorMessage = error instanceof Error ? error.message : "Ha ocurrido un error en el manejador IPC para un middleware After";
-          Logger.error(errorMessage, "ELECTRON DI");
+          Logger.error(error.message, "ELECTRON DI");
         });
         return response;
       } catch (error) {
-        Logger.error(`Error en el manejador IPC: ${error.message}`);
-        return {
-          headers: { success: "false" },
-          payload: {
-            data: error instanceof Error == false ? error : void 0,
-            error: error instanceof Error ? error.message : "Ha ocurrido un error en el manejador IPC",
-            stack: process.env.NODE_ENV === "development" ? error.stack : void 0
-          }
-        };
+        return this.handleError(error);
       }
     });
   }
   static formatResponse(result, response) {
-    if (typeof result === "undefined") return response.toPlainObject();
-    if (result instanceof Response2) return result.toPlainObject();
-    return response.send(result).toPlainObject();
+    if (typeof result === "undefined" && typeof response.Data === "undefined")
+      return void 0;
+    if (typeof result === "undefined" && typeof response.Data !== "undefined")
+      return response.Data;
+    response.Data = result;
+    return response.Data;
   }
   static registerHandler(channel, instance, method, type, middlewares2) {
     if (!channel || typeof channel !== "string") {
@@ -833,9 +783,8 @@ var IPCHandler = class {
     }
     const handler = (event, ...args) => __async(this, null, function* () {
       const context = {
-        request: new Request2(args[0]).toPlainObject(),
-        response: new Response2(),
-        event
+        request: new Request2(event, args[0]),
+        response: new Response2()
       };
       return this.handleRequest(instance, method, context, middlewares2);
     });
@@ -899,7 +848,6 @@ function Bootstrap(module3) {
   Bootstrap,
   Controller,
   Global,
-  Headers,
   IPCEvent,
   Inject,
   Injectable,

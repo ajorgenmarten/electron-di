@@ -3,8 +3,8 @@ import symbols from "./constants";
 import { Container } from "./container";
 import {
   Class,
+  IIPCErrorConstructorParam,
   IMiddleware,
-  IRequest,
   IMiddlewareContext,
 } from "../types/general.types";
 import { Logger } from "./logger";
@@ -17,6 +17,14 @@ import {
   Request as ElectronDIRequest,
   Response as ElectronDIResponse,
 } from "./params";
+
+class IPCError extends Error {
+  details: any;
+  constructor(data: IIPCErrorConstructorParam) {
+    super(data.message);
+    this.details = data.details;
+  }
+}
 
 class MetadataManager {
   static getMethodMetadata(
@@ -51,22 +59,22 @@ class MiddlewareHandler {
   static async executeBeforeMiddlewares(
     middlewares: IMiddleware<"Before">[],
     context: IMiddlewareContext
-  ): Promise<boolean> {
+  ) {
     if (!middlewares || !Array.isArray(middlewares)) {
-      Logger.warn("Middlewares Before no es un array válido");
-      return true;
+      const message = "Middlewares Before no es un array válido";
+      Logger.warn(message);
+      return { success: false, reason: message };
     }
-    try {
-      for (const middleware of middlewares) {
-        const params = this.resolveMiddlewareParams(middleware, context);
-        const result = await middleware.execute(...params);
-        if (result === false) return false;
-      }
-      return true;
-    } catch (error) {
-      Logger.error(`Error en middleware Before: ${(error as Error).message}`);
-      return false;
+    for (const middleware of middlewares) {
+      const params = this.resolveMiddlewareParams(middleware, context);
+      const result = await middleware.execute(...params);
+      if (!result)
+        return {
+          success: false,
+          reason: `Middleware ${middleware.constructor.name} ha retornado "false".`,
+        };
     }
+    return { success: true };
   }
 
   static async executeAfterMiddlewares(
@@ -97,13 +105,11 @@ class ParamsResolver {
     return params.map((param) => {
       switch (param.type) {
         case "IpcEvent":
-          return context.event;
+          return context.request.Event;
         case "Request":
           return context.request;
-        case "Headers":
-          return context.request.headers;
         case "Payload":
-          return context.request.payload;
+          return context.request.Payload;
         case "Response":
           return context.response;
         default:
@@ -114,6 +120,21 @@ class ParamsResolver {
 }
 
 class IPCHandler {
+  private static handleError(error: unknown) {
+    if (error instanceof IPCError) {
+      return {
+        success: false,
+        reason: error.message,
+        details: error.details,
+      };
+    }
+    Logger.error((error as Error).message || "Internal Error", "ELECTRON DI");
+    return {
+      success: false,
+      reason: "Internal Error",
+      details: error,
+    };
+  }
   private static async handleRequest(
     instance: InstanceType<Class>,
     method: string,
@@ -122,25 +143,26 @@ class IPCHandler {
       before: IMiddleware<"Before">[];
       after: IMiddleware<"After">[];
     }
-  ): Promise<IRequest> {
+  ): Promise<any> {
     try {
       const beforeResult = await MiddlewareHandler.executeBeforeMiddlewares(
         middlewares.before,
         context
       );
-
-      if (!beforeResult) {
-        return {
-          headers: { success: "false" },
-          payload: { error: "Falló la ejecución de middlewares Before" },
-        };
+      if (!beforeResult.success) {
+        Logger.error(beforeResult.reason ?? "Un middleware no se ha cumplido");
+        return beforeResult;
       }
+    } catch (error) {
+      return this.handleError(error);
+    }
 
-      const params = ParamsResolver.resolveParams(
-        MetadataManager.getParamsMetadata(instance, method),
-        context
-      );
+    const params = ParamsResolver.resolveParams(
+      MetadataManager.getParamsMetadata(instance, method),
+      context
+    );
 
+    try {
       const result = await instance[method](...params);
       const response = this.formatResponse(result, context.response);
 
@@ -148,40 +170,22 @@ class IPCHandler {
         middlewares.after,
         context
       ).catch((error) => {
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "Ha ocurrido un error en el manejador IPC para un middleware After";
-        Logger.error(errorMessage, "ELECTRON DI");
+        Logger.error(error.message, "ELECTRON DI");
       });
 
       return response;
     } catch (error) {
-      Logger.error(`Error en el manejador IPC: ${(error as Error).message}`);
-      return {
-        headers: { success: "false" },
-        payload: {
-          data: error instanceof Error == false ? error : undefined,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Ha ocurrido un error en el manejador IPC",
-          stack:
-            process.env.NODE_ENV === "development"
-              ? (error as Error).stack
-              : undefined,
-        },
-      };
+      return this.handleError(error);
     }
   }
 
-  private static formatResponse(
-    result: any,
-    response: ElectronDIResponse
-  ): IRequest {
-    if (typeof result === "undefined") return response.toPlainObject();
-    if (result instanceof ElectronDIResponse) return result.toPlainObject();
-    return response.send(result).toPlainObject();
+  private static formatResponse(result: any, response: ElectronDIResponse) {
+    if (typeof result === "undefined" && typeof response.Data === "undefined")
+      return undefined;
+    if (typeof result === "undefined" && typeof response.Data !== "undefined")
+      return response.Data;
+    response.Data = result;
+    return response.Data;
   }
 
   static registerHandler(
@@ -208,11 +212,10 @@ class IPCHandler {
     const handler = async (
       event: IpcMainInvokeEvent | IpcMainEvent,
       ...args: any[]
-    ): Promise<IRequest> => {
+    ): Promise<Request> => {
       const context: IMiddlewareContext = {
-        request: new ElectronDIRequest(args[0]).toPlainObject(),
+        request: new ElectronDIRequest(event, args[0]),
         response: new ElectronDIResponse(),
-        event,
       };
 
       return this.handleRequest(instance, method, context, middlewares);

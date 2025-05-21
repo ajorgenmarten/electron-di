@@ -324,25 +324,6 @@ Y si la llamada se hace a `app:bar` se mostraría lo siguiente:
    After all
 ```
 
-## Decorador `@Headers`
-
-El decorador `@Headers` se utiliza para inyectar los encabezados de una solicitud IPC en un parámetro del método del controlador. Este decorador es útil cuando necesitas acceder a información adicional enviada en los encabezados de la solicitud.
-
-### Uso Básico
-
-```typescript
-import { Controller, OnInvoke, Headers } from "electron-di";
-
-@Controller("app")
-class AppController {
-  @OnInvoke("greet")
-  async greet(@Headers() headers: any) {
-    console.log("Headers recibidos:", headers);
-    return `Hello with headers!`;
-  }
-}
-```
-
 ## Decorador `@Inject`
 
 El decorador `@Inject` se utiliza para inyectar dependencias específicas en el constructor de una clase. Es especialmente útil cuando necesitas especificar qué implementación concreta debe ser inyectada para una dependencia abstracta.

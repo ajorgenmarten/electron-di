@@ -1,4 +1,5 @@
 import { Request, Response } from "@core/params";
+import { BrowserWindow } from "electron";
 
 export type Class<T = any> = new (...args: any[]) => T;
 
@@ -24,6 +25,7 @@ export interface IRequest<PayloadDataType = any> {
 interface IMiddlewareContext {
   request: Request;
   response: Response;
+  mainWindow?: BrowserWindow;
 }
 
 interface IIPCErrorConstructorParam {

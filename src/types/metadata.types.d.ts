@@ -6,6 +6,7 @@ export type ParamsDecorator =
   | "Payload"
   | "Headers"
   | "Request"
+  | "MainWindow"
   | "Response";
 export interface ItemParamMetadata {
   type: ParamsDecorator;

@@ -1,4 +1,9 @@
-import { ipcMain, IpcMainEvent, IpcMainInvokeEvent } from "electron";
+import {
+  BrowserWindow,
+  ipcMain,
+  IpcMainEvent,
+  IpcMainInvokeEvent,
+} from "electron";
 import symbols from "./constants";
 import { Container } from "./container";
 import {
@@ -112,6 +117,8 @@ class ParamsResolver {
           return context.request.Payload;
         case "Response":
           return context.response;
+        case "MainWindow":
+          return context.mainWindow;
         default:
           return undefined;
       }
@@ -196,7 +203,8 @@ class IPCHandler {
     middlewares: {
       before: IMiddleware<"Before">[];
       after: IMiddleware<"After">[];
-    }
+    },
+    mainWindow?: BrowserWindow
   ): void {
     if (!channel || typeof channel !== "string") {
       throw new Error("El channel debe ser un string válido");
@@ -216,6 +224,7 @@ class IPCHandler {
       const context: IMiddlewareContext = {
         request: new ElectronDIRequest(event, args[0]),
         response: new ElectronDIResponse(),
+        mainWindow,
       };
 
       return this.handleRequest(instance, method, context, middlewares);
@@ -237,7 +246,7 @@ class IPCHandler {
  * @example
  * Bootstrap(AppModule);
  */
-export function Bootstrap(module: Class): void {
+export function Bootstrap(module: Class, mainWindow?: BrowserWindow): void {
   const container = new Container();
   container.registerModule(module);
 
@@ -301,7 +310,8 @@ export function Bootstrap(module: Class): void {
         controller.instance,
         method,
         metadata.type,
-        middlewares
+        middlewares,
+        mainWindow
       );
     }
   }

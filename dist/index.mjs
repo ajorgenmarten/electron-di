@@ -201,20 +201,6 @@ function Before(token) {
   };
 }
 
-// src/decorators/Payload.ts
-function Payload() {
-  return function(target, propertyKey, paramIndex) {
-    var _a;
-    const metadata = (_a = Reflect.getMetadata(
-      constants_default.paramsArg,
-      target,
-      propertyKey
-    )) != null ? _a : { params: [] };
-    metadata.params[paramIndex] = { type: "Payload" };
-    Reflect.defineMetadata(constants_default.paramsArg, metadata, target, propertyKey);
-  };
-}
-
 // src/decorators/Controller.ts
 function Controller(prefix) {
   return function(target) {
@@ -274,6 +260,20 @@ function IPCEvent() {
   };
 }
 
+// src/decorators/MainWindow.ts
+function MainWindow() {
+  return function(target, propertyKey, paramIndex) {
+    var _a;
+    const metadata = (_a = Reflect.getMetadata(
+      constants_default.paramsArg,
+      target,
+      propertyKey
+    )) != null ? _a : { params: [] };
+    metadata.params[paramIndex] = { type: "MainWindow" };
+    Reflect.defineMetadata(constants_default.paramsArg, metadata, target, propertyKey);
+  };
+}
+
 // src/decorators/Module.ts
 function Module(options) {
   return function(target) {
@@ -301,6 +301,20 @@ function OnSend(channel) {
       channel
     };
     Reflect.defineMetadata(constants_default.ipcmethod, metadata, target, propertyKey);
+  };
+}
+
+// src/decorators/Payload.ts
+function Payload() {
+  return function(target, propertyKey, paramIndex) {
+    var _a;
+    const metadata = (_a = Reflect.getMetadata(
+      constants_default.paramsArg,
+      target,
+      propertyKey
+    )) != null ? _a : { params: [] };
+    metadata.params[paramIndex] = { type: "Payload" };
+    Reflect.defineMetadata(constants_default.paramsArg, metadata, target, propertyKey);
   };
 }
 
@@ -333,7 +347,9 @@ function Response() {
 }
 
 // src/core/bootstrap.ts
-import { ipcMain } from "electron";
+import {
+  ipcMain
+} from "electron";
 
 // src/core/container.ts
 var Component = class {
@@ -670,6 +686,8 @@ var ParamsResolver = class {
           return context.request.Payload;
         case "Response":
           return context.response;
+        case "MainWindow":
+          return context.mainWindow;
         default:
           return void 0;
       }
@@ -734,7 +752,7 @@ var IPCHandler = class {
     response.Data = result;
     return response.Data;
   }
-  static registerHandler(channel, instance, method, type, middlewares2) {
+  static registerHandler(channel, instance, method, type, middlewares2, mainWindow) {
     if (!channel || typeof channel !== "string") {
       throw new Error("El channel debe ser un string v\xE1lido");
     }
@@ -747,14 +765,15 @@ var IPCHandler = class {
     const handler = (event, ...args) => __async(this, null, function* () {
       const context = {
         request: new Request2(event, args[0]),
-        response: new Response2()
+        response: new Response2(),
+        mainWindow
       };
       return this.handleRequest(instance, method, context, middlewares2);
     });
     type === "invoke" ? ipcMain.handle(channel, handler) : ipcMain.on(channel, handler);
   }
 };
-function Bootstrap(module2) {
+function Bootstrap(module2, mainWindow) {
   const container = new Container();
   container.registerModule(module2);
   const controllers = container.Modules.flatMap(
@@ -799,7 +818,8 @@ function Bootstrap(module2) {
         controller2.instance,
         method,
         metadata.type,
-        middlewares2
+        middlewares2,
+        mainWindow
       );
     }
   }
@@ -814,6 +834,7 @@ export {
   Inject,
   Injectable,
   Logger,
+  MainWindow,
   Module,
   OnInvoke,
   OnSend,

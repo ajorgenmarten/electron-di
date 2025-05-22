@@ -1,3 +1,5 @@
+import { BrowserWindow } from 'electron';
+
 declare const COLORS: {
     BACKGROUND: {
         LIGHT: {
@@ -149,26 +151,6 @@ declare function After(token: Token): (target: any, propertyKey?: string | undef
 declare function Before(token: Token): (target: any, propertyKey?: string | undefined, _propertyDescriptor?: PropertyDescriptor) => void;
 
 /**
- * Decorador que permite inyectar el payload de un evento IPC como parámetro en un método.
- *
- * @remarks
- * Este decorador se utiliza para marcar un parámetro de un método que debe recibir
- * el payload enviado desde el proceso principal o renderer de Electron.
- *
- * @example
- * ```typescript
- * |@Controller()
- * class MyService {
- *   |@OnInvoke('my-event')
- *   handleEvent(@Payload() data: any) {
- *     console.log(data); // Payload del evento IPC
- *   }
- * }
- * ```
- */
-declare function Payload(): (target: any, propertyKey: string, paramIndex: number) => void;
-
-/**
  * Función decoradora para Controladores
  * Marca una clase como controlador y permite establecer un prefijo de ruta
  *
@@ -252,6 +234,28 @@ declare function Injectable(): (target: Class) => void;
  */
 declare function IPCEvent(): (target: any, propertyKey: string, paramIndex: number) => void;
 
+/**
+ * Decorador que marca un parámetro como el objeto de la ventana principal..
+ *
+ * @remarks
+ * Este decorador se utiliza para inyectar la ventana principal en los métodos de un controlador.
+ *
+ * @example
+ * ```typescript
+ * |@Controller()
+ * class MyClass {
+ *   |@OnInvoke('my-event')
+ *   public myMethod(@MainWindow() window: BrowserWindow) {
+ *     // Manejar el evento IPC
+ *   }
+ * }
+ * ```
+ *
+ * @returns Un decorador de parámetro que registra los metadatos necesarios
+ * para la inyección del evento IPC.
+ */
+declare function MainWindow(): (target: any, propertyKey: string, paramIndex: number) => void;
+
 type IProvider = { provide: Token; useClass: Class } | Class;
 
 interface ModuleOptions {
@@ -317,6 +321,26 @@ declare function OnInvoke(channel: string): (target: any, propertyKey: string, d
 declare function OnSend(channel: string): (target: any, propertyKey: string, descriptor: PropertyDescriptor) => void;
 
 /**
+ * Decorador que permite inyectar el payload de un evento IPC como parámetro en un método.
+ *
+ * @remarks
+ * Este decorador se utiliza para marcar un parámetro de un método que debe recibir
+ * el payload enviado desde el proceso principal o renderer de Electron.
+ *
+ * @example
+ * ```typescript
+ * |@Controller()
+ * class MyService {
+ *   |@OnInvoke('my-event')
+ *   handleEvent(@Payload() data: any) {
+ *     console.log(data); // Payload del evento IPC
+ *   }
+ * }
+ * ```
+ */
+declare function Payload(): (target: any, propertyKey: string, paramIndex: number) => void;
+
+/**
  * Decorador que permite inyectar el objeto Request en los parámetros de un método.
  *
  * @remarks
@@ -370,6 +394,6 @@ declare function Response(): (target: any, propertyKey: string, paramIndex: numb
  * @example
  * Bootstrap(AppModule);
  */
-declare function Bootstrap(module: Class): void;
+declare function Bootstrap(module: Class, mainWindow?: BrowserWindow): void;
 
-export { After, Before, Bootstrap, Controller, Global, type IMiddleware, IPCEvent, type IRequest, Inject, Injectable, Logger, Module, OnInvoke, OnSend, Payload, Request, Response };
+export { After, Before, Bootstrap, Controller, Global, type IMiddleware, IPCEvent, type IRequest, Inject, Injectable, Logger, MainWindow, Module, OnInvoke, OnSend, Payload, Request, Response };

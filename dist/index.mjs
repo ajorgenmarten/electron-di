@@ -830,6 +830,7 @@ export {
   Bootstrap,
   Controller,
   Global,
+  IPCError,
   IPCEvent,
   Inject,
   Injectable,

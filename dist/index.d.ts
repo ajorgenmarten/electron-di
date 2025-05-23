@@ -95,6 +95,11 @@ interface IRequest<PayloadDataType = any> {
   Payload?: PayloadDataType | undefined;
 }
 
+interface IIPCErrorConstructorParam {
+  message: string;
+  details?: any;
+}
+
 /**
  * Decorador que registra un middleware "After" para ser ejecutado después de un método o clase.
  *
@@ -384,6 +389,10 @@ declare function Request(): (target: any, propertyKey: string, paramIndex: numbe
  */
 declare function Response(): (target: any, propertyKey: string, paramIndex: number) => void;
 
+declare class IPCError extends Error {
+    details: any;
+    constructor(data: IIPCErrorConstructorParam);
+}
 /**
  * Inicializa la aplicación Electron con el módulo principal.
  * Registra todos los controladores y middlewares definidos en el módulo.
@@ -396,4 +405,4 @@ declare function Response(): (target: any, propertyKey: string, paramIndex: numb
  */
 declare function Bootstrap(module: Class, mainWindow?: BrowserWindow): void;
 
-export { After, Before, Bootstrap, Controller, Global, type IMiddleware, IPCEvent, type IRequest, Inject, Injectable, Logger, MainWindow, Module, OnInvoke, OnSend, Payload, Request, Response };
+export { After, Before, Bootstrap, Controller, Global, type IMiddleware, IPCError, IPCEvent, type IRequest, Inject, Injectable, Logger, MainWindow, Module, OnInvoke, OnSend, Payload, Request, Response };

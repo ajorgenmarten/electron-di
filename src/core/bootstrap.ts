@@ -23,7 +23,7 @@ import {
   Response as ElectronDIResponse,
 } from "./params";
 
-class IPCError extends Error {
+export class IPCError extends Error {
   details: any;
   constructor(data: IIPCErrorConstructorParam) {
     super(data.message);

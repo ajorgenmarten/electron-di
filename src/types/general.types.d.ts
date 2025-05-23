@@ -28,7 +28,7 @@ interface IMiddlewareContext {
   mainWindow?: BrowserWindow;
 }
 
-interface IIPCErrorConstructorParam {
+export interface IIPCErrorConstructorParam {
   message: string;
   details?: any;
 }

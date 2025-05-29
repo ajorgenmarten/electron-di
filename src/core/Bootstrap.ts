@@ -1,19 +1,15 @@
 import { Class } from "../types";
 import { DependencyContainer } from "./Container";
 
-class App {
-    constructor(
-        private container: DependencyContainer
-    ) {}
-
-    
-}
 
 export class ElectronDI {
+    private static container: DependencyContainer;
 
     static createApp(initModule: Class) {
         
-        return new App(new DependencyContainer(initModule))
+        this.container = (new DependencyContainer(initModule))
+
+        return this.container;
 
     }
 }

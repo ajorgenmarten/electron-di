@@ -1,0 +1,41 @@
+{
+  "name": "electron-di",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "electron",
+    "electron di",
+    "dependency injection",
+    "electron framework",
+    "framework"
+  ],
+  "author": "Alejandro Jorgen Martén",
+  "license": "MIT",
+  "description": "Util para brindar a tu aplicación de electron la capacidad de ser construida con un código limpio y mantenible.",
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "electron": ">=22.0.0",
+    "reflect-metadata": "^0.2.2"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "browser": false,
+  "publishConfig": {
+    "access": "public",
+    "tag": "latest"
+  }
+}

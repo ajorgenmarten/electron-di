@@ -3,5 +3,7 @@ export const SYMBOLS = {
     provider: Symbol('electron:provider'),
     module: Symbol('electron:module'),
     global: Symbol('electron:global'),
-    middleware: Symbol('electron:middleware')
+    middleware: Symbol('electron:middleware'),
+    params: Symbol('electron:param'),
+    handler: Symbol('electron:handler')
 }

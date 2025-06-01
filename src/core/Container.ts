@@ -2,21 +2,27 @@ import { Class, ControllerMetadata, ModuleMetadata, Provider, Token } from "../t
 import { SYMBOLS } from "./Symbols";
 
 class Injectable {
+    public Dependencies: Token[];
     constructor(
         public Value: Class,
         public Provider: Token,
         public Exported: boolean,
-        public Dependencies: Token[],
         public Instance: Class | null = null
-    ) {}
+    ) {
+        const paramTypes = Reflect.getMetadata('design:paramtypes', this.Value)
+        this.Dependencies = paramTypes || []
+    }
 }
 
 class Controller {
+    public Dependencies: Token[];
     constructor(
         public Value: Class,
-        public Dependencies: Token[],
         public Instance: Class | null = null
-    ) {}
+    ) {
+        const paramTypes = Reflect.getMetadata('design:paramtypes', this.Value)
+        this.Dependencies = paramTypes || []
+    }
 }
 
 class NodeModule {
@@ -95,8 +101,7 @@ export class DependencyContainer {
         for(const controller of controllers) {
             const controllerMetaData = Reflect.getMetadata(SYMBOLS.controller, controller) as ControllerMetadata | undefined
             if (!controllerMetaData) throw new Error(`Please decore the class "${controller.name}" with @Controller()`)
-            const paramTypes = Reflect.getMetadata('design:paramtypes', controller) as Token[]
-            const controllerModel = new Controller(controller, paramTypes)
+            const controllerModel = new Controller(controller)
             result.push(controllerModel)
         }
         return result
@@ -109,8 +114,7 @@ export class DependencyContainer {
             const [token, cls] = typeof provider === "object" ? [provider.provided, provider.useClass] : [provider, provider]
             const injectableMetadata = Reflect.getMetadata(SYMBOLS.provider, cls) as boolean
             if (!injectableMetadata) throw new Error(`Please decore the class "${cls.name}" with @Injectable()`)
-            const paramTypes = Reflect.getMetadata('design:paramtypes', cls) as Token[]
-            const injectableModel = new Injectable(cls, token, exports?.find(e => e === token) ? true : false, paramTypes)
+            const injectableModel = new Injectable(cls, token, exports?.find(e => e === token) ? true : false)
             result.push(injectableModel)
         }
         return result

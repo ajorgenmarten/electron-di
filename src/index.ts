@@ -1,2 +1,5 @@
 import "reflect-metadata"
-export { ElectronDI } from './core'
+export * from './core'
+export * from './decorators'
+export * from './functions'
+export * from './types'

@@ -1,16 +1,16 @@
 {
-  "name": "electron-di",
+  "name": "electron-di2",
   "version": "1.0.0",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+    "import": "./dist/index.mjs",
+    "require": "./dist/index.cjs"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
+    "watch": "tsup --watch",
     "prepare": "npm run build"
   },
   "keywords": [
@@ -20,22 +20,30 @@
     "electron framework",
     "framework"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ajorgenmarten/electron-di2.git"
+  },
   "author": "Alejandro Jorgen Martén",
   "license": "MIT",
   "description": "Util para brindar a tu aplicación de electron la capacidad de ser construida con un código limpio y mantenible.",
   "devDependencies": {
+    "@swc/core": "^1.11.29",
+    "@types/node": "^22.15.29",
+    "tsup": "^8.5.0",
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "electron": ">=22.0.0",
     "reflect-metadata": "^0.2.2"
+  },
+  "peerDependencies": {
+    "electron": ">=22.0.0"
   },
   "engines": {
     "node": ">=16"
   },
-  "browser": false,
   "publishConfig": {
-    "access": "public",
-    "tag": "latest"
-  }
+    "access": "public"
+  },
+  "browser": false
 }

@@ -1,2 +1,2 @@
-export { ElectronDI } from './Bootstrap'
-export { Logger } from './Logger'
+export * from './Bootstrap'
+export * from './Logger'

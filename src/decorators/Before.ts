@@ -1,7 +1,7 @@
 import { SYMBOLS } from "../core/Symbols"
 import { MiddlewareMetadata, Token } from "../types"
 
-export function After(...middlewares: Token[]): ClassDecorator | MethodDecorator {
+export function Before(...middlewares: Token[]): ClassDecorator | MethodDecorator {
     return function (target, propertyKey) {
         const metadatas: MiddlewareMetadata[] = Reflect.getMetadata(SYMBOLS.middleware, target, propertyKey) || []
         for (const middleware of middlewares) {

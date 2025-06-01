@@ -1,4 +1,4 @@
-import { IpcMainEvent, IpcMainInvokeEvent, ipcMain } from "electron"
+import { IpcMainEvent, IpcMainInvokeEvent } from "electron"
 
 export type Class<T = any> = new (...args: any[]) => T
 
@@ -27,6 +27,13 @@ export type MiddlewareMetadata = {
     level: "class" | "method"
     token: Token
 }
+
+export type HandlerMetadata = {
+    type: "invoke" | "send"
+    channel: string
+}
+
+export type ParamMetadata = ("event"|"payload"|"request"|"response")[]
 
 export type ExecutionContext = {
     ipcEvent: IpcMainInvokeEvent | IpcMainEvent

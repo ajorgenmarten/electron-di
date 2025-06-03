@@ -1,8 +1,8 @@
-import { SYMBOLS } from "../core/Symbols";
-import { ModuleMetadata } from "../types";
+import ReflectionHandler from "../core/ReflectionHandler";
+import { Class, ModuleMetadata } from "../types";
 
 export function Module(options: ModuleMetadata): ClassDecorator {
-    return function (target) {
-        Reflect.defineMetadata(SYMBOLS.module, options, target)
+    return function (target: Object) {
+        ReflectionHandler.setModuleMetadata(options, target as Class)
     }
 }

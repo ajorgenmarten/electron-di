@@ -19,18 +19,21 @@ export type ModuleMetadata = {
 }
 
 export type ControllerMetadata = {
-    prefix?: string
+    prefix: string
 }
 
-export type MiddlewareMetadata = {
-    type: "after" | "before"
-    level: "class" | "method"
-    token: Token
+export type InjectableMetadata = {
+    scope: "singleton" | "transient"
 }
 
 export type HandlerMetadata = {
     type: "invoke" | "send"
     channel: string
+}
+
+export type MiddlewareMetadata = {
+    type: "after" | "before"
+    token: Token
 }
 
 export type ParamMetadata = ("event"|"payload"|"request"|"response")[]

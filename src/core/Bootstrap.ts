@@ -1,15 +1,18 @@
-import { Class } from "../types";
+import { Class, Provider, Token } from "../types";
 import { DependencyContainer } from "./Container";
+import ReflectionHandler from "./ReflectionHandler";
 
+class App {
+    constructor(private container: DependencyContainer) { }
+
+    get Container() {
+        return this.container;
+    }
+}
 
 export class ElectronDI {
-    private static container: DependencyContainer;
-
-    static createApp(initModule: Class) {
-        
-        this.container = (new DependencyContainer(initModule))
-
-        return this.container;
-
+    static createApp(MainModule: Class) {
+        const app = new App(new DependencyContainer(MainModule))
+        return app;
     }
 }

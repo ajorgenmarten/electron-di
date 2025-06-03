@@ -1,140 +1,158 @@
-import { Class, ControllerMetadata, ModuleMetadata, Provider, Token } from "../types";
-import { SYMBOLS } from "./Symbols";
+import { Class, InjectableMetadata, Provider, Token } from "../types"
+import ReflectionHandler from "./ReflectionHandler";
 
-class Injectable {
-    public Dependencies: Token[];
-    constructor(
-        public Value: Class,
-        public Provider: Token,
-        public Exported: boolean,
-        public Instance: Class | null = null
-    ) {
-        const paramTypes = Reflect.getMetadata('design:paramtypes', this.Value)
-        this.Dependencies = paramTypes || []
-    }
+type ProviderRegister = {
+    ScopeModule: Class
+    Value: Class
+    Options: InjectableMetadata
 }
 
-class Controller {
-    public Dependencies: Token[];
-    constructor(
-        public Value: Class,
-        public Instance: Class | null = null
-    ) {
-        const paramTypes = Reflect.getMetadata('design:paramtypes', this.Value)
-        this.Dependencies = paramTypes || []
-    }
-}
-
-class NodeModule {
-    constructor(
-        public Value: Class,
-        public Injectables: Injectable[],
-        public Controllers: Controller[],
-        public Global: boolean,
-        public Branches: NodeModule[],
-        public FindInGlobalHook: ((token: Token) => Injectable | null)
-    ) {}
-
-    instanceControllers() {
-        for(const controller of this.Controllers) {
-            if (!controller.Dependencies) {
-                controller.Instance = new controller.Value()
-                continue;
-            }
-            const instances = controller.Dependencies.map(dep => this.resolve(dep)?.Instance)
-            controller.Instance = new controller.Value(...instances)
-        }
-    }
-
-    resolve(token: Token, level: number = 1): Injectable | null {
-        for(const injectable of this.Injectables) {
-            if (injectable.Provider !== token) continue;
-            if (injectable.Instance) return injectable
-            if (!injectable.Dependencies) {
-                injectable.Instance = new injectable.Value()
-                return injectable
-            }
-            const instances: (Injectable | null)[] = injectable.Dependencies.map(dep => this.resolve(dep))
-            injectable.Instance = new injectable.Value(...instances)
-            return injectable
-        }
-        if (level == 0) return null
-        for(const branch of this.Branches) {
-            if (branch.Global) continue;
-            const injectable = branch.resolve(token, --level)
-            if (!injectable) continue;
-            if (!injectable.Exported) return null
-            return injectable
-        }
-        return this.FindInGlobalHook(token);
-    }
-
+type ModuleRegister = {
+    Providers: Set<Token>
+    Imports: Set<Class>
+    Exports: Set<Token>
 }
 
 export class DependencyContainer {
-    private root: NodeModule;
+    private globals: Map<Class, ModuleRegister> = new Map();
+    private modules: Map<Class, ModuleRegister> = new Map();
+    private providers: Map<Token, ProviderRegister> = new Map();
+    private instances: Map<Token, Class> = new Map();
 
     constructor(module: Class) {
-        this.root = this.getTreeModules(module)
-        this.build(this.root)
+        this.register(module)
     }
 
-    private getTreeModules(module: Class) {
-        const moduleMetadata = Reflect.getMetadata(SYMBOLS.module, module) as ModuleMetadata | undefined
-        if (!moduleMetadata) throw new Error(`Please decore the class "${module.name}" with @Module({})`)
-        const globalMetadata = Reflect.getMetadata(SYMBOLS.global, module) as boolean || false
-        const nodeModule = new NodeModule(
-            module,
-            this.getProviders(moduleMetadata.providers, moduleMetadata.exports),
-            this.getControllers(moduleMetadata.controllers),
-            globalMetadata,
-            [], (token: Token) => this.resolveInGlobalHook(token, this.root))
-        if (!moduleMetadata.imports) return nodeModule 
-        for (const importModule of moduleMetadata.imports)
-            nodeModule.Branches.push(this.getTreeModules(importModule))
-        return nodeModule
-    }
+    private register(module: Class) {
+        if (this.modules.has(module) || this.globals.has(module)) return
 
-    private getControllers(controllers?: Class[]): Controller[] {
-        if (!controllers || controllers.length == 0) return []
-        const result = []
-        for(const controller of controllers) {
-            const controllerMetaData = Reflect.getMetadata(SYMBOLS.controller, controller) as ControllerMetadata | undefined
-            if (!controllerMetaData) throw new Error(`Please decore the class "${controller.name}" with @Controller()`)
-            const controllerModel = new Controller(controller)
-            result.push(controllerModel)
+        const module_metadata = ReflectionHandler.getModuleMetadata(module)
+        if (!module_metadata) throw new Error(`Class "${module.name}" is not a module`)
+
+        const module_global: boolean = ReflectionHandler.getGlobalMetadata(module)
+        const module_registered_data = { 
+            Exports: new Set( module_metadata.exports || [] ),
+            Imports: new Set( module_metadata.imports || [] ),
+            Providers: new Set( module_metadata.providers?.map(p => typeof p === 'object' ? p.provided : p) || [] )
         }
-        return result
+        if (module_global) this.globals.set(module, module_registered_data)
+        else this.modules.set( module, module_registered_data)
+
+        module_metadata.imports?.forEach(sub_module => { this.register(sub_module) })
+        
+        module_metadata.providers?.forEach(provider => { this.register_provider(provider, module) })
+
     }
 
-    private getProviders(providers?: Provider[], exports?: Token[]): Injectable[] {
-        if (!providers || providers.length == 0) return []
-        const result = []
-        for(const provider of providers) {
-            const [token, cls] = typeof provider === "object" ? [provider.provided, provider.useClass] : [provider, provider]
-            const injectableMetadata = Reflect.getMetadata(SYMBOLS.provider, cls) as boolean
-            if (!injectableMetadata) throw new Error(`Please decore the class "${cls.name}" with @Injectable()`)
-            const injectableModel = new Injectable(cls, token, exports?.find(e => e === token) ? true : false)
-            result.push(injectableModel)
-        }
-        return result
+    private register_provider(provider: Provider, scope_module: Class) {
+        const [token, cls] = typeof provider === 'object' ? [provider.provided, provider.useClass] : [provider, provider]
+        
+        if (this.providers.has(token)) return
+
+        const options = ReflectionHandler.getInjectableMetadata(cls)
+        if (!options) throw new Error(`Class "${cls.name}" is not injectable`)
+
+        this.providers.set(token, { Options: options, Value: cls, ScopeModule: scope_module })
     }
 
-    private resolveInGlobalHook(token: Token, nodeModule: NodeModule): Injectable | null {
-        if (nodeModule.Global) {
-            const instance = nodeModule.resolve(token)
-            if (instance) return instance
+    private check_scope_access(token: Token, root: Class, scope: Class) {
+        if (root === scope && this.modules.get(root)?.Providers.has(token)) return true
+        
+        const modules = this.modules.get(root)?.Imports
+
+        if (!modules) return false
+
+        for( const module of modules) {
+            if (this.globals.has(module)) continue;
+
+            const module_registered = this.modules.get(module) as ModuleRegister
+
+            const [in_providers, in_exports] = [
+                module_registered.Providers.has(token),
+                module_registered.Exports.has(token)
+            ]
+            
+            if (in_providers && in_exports) return true
+
+            if (in_exports && this.check_scope_access(token, root, module)) return true 
         }
-        for (const branch of nodeModule.Branches) {
-            const instance = this.resolveInGlobalHook(token, branch)
-            if (instance) return instance
+
+        return false
+    }
+    
+    private check_global_access(token: Token) {
+        const global_modules = Array.from(this.globals)
+
+        for (const [module, module_info] of global_modules) {
+            const [in_providers, in_exports] = [
+                module_info.Providers.has(token),
+                module_info.Exports.has(token)
+            ]
+
+            if (in_providers && in_exports) return true
+
+            if (in_exports) {
+                
+                const modules = Array.from(module_info.Imports)
+
+                for (const import_module of modules) {
+                    if (this.globals.has(import_module)) continue;
+
+                    const module_registered = this.modules.get(import_module) as ModuleRegister
+
+                    if (module_registered.Exports.has(token) && this.check_scope_access(token, module, import_module)) return true
+
+                }
+
+            }
+
         }
-        return null        
+
+        return false
     }
 
-    private build(root: NodeModule) {
-        if (root.Branches)
-            for(const branch of root.Branches) this.build(branch)
-        root.instanceControllers()
+    /**
+    // CONDICIONES PARA RESOLVER UN PROVEEDOR
+    // 1. Debe estar definido en los proveedores de esta clase
+    // 2. Debe estar registrado y exportado en un modulo global
+    // 3. Debe estar registrado y exportdao en un modulo importado
+    */
+    resolve<T>(token: Token<T>, scope: Class): Class<T> {
+        const provider = this.providers.get(token)
+        if (!provider) throw new Error(`Class "${token.name}" has been not provided`)
+
+        if (!this.check_global_access(token) && !this.check_scope_access(token, scope, scope))
+            throw new Error(`Class "${token.name}" can not injected in this scope`)
+
+        if (provider.Options.scope === "singleton" && this.instances.has(token)) {
+            return this.instances.get(token) as Class<T>
+        }
+
+        const injections = ReflectionHandler.getParamTypes(provider.Value)
+        const dependencies = injections.map(depToken => this.resolve(depToken, provider.ScopeModule))
+
+        const instance = new provider.Value(...dependencies)
+
+        if (provider.Options.scope === "singleton") {
+            this.instances.set(token, instance)
+        }
+
+        return instance
+    }
+
+    get Instances() {
+        return this.instances
+    }
+
+    get Globals() {
+        return this.globals
+    }
+
+    get Modules() {
+        return this.modules
+    }
+
+    get Providers() {
+        return this.providers
     }
 }

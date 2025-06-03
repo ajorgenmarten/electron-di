@@ -1,8 +1,9 @@
-import { SYMBOLS } from "../core/Symbols"
+import ReflectionHandler from "../core/ReflectionHandler"
+import { Class, ControllerMetadata } from "../types"
 
 export function Controller(prefix?: string): ClassDecorator {
-    return function (target) {
-        const controllerMetadata = prefix ? { prefix } : true
-        Reflect.defineMetadata(SYMBOLS.controller, controllerMetadata, target)
+    return function (target: Object) {
+        const metadata: ControllerMetadata = { prefix: prefix ?? "" }
+        ReflectionHandler.setControllerMetadata(metadata, target as Class)
     }
 }

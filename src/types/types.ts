@@ -41,8 +41,6 @@ export type ParamMetadata = ("event"|"payload"|"request")[]
 export type ExecutionContext = {
     ipcEvent: IpcMainInvokeEvent | IpcMainEvent
     payload: any
-    handler: InstanceOf<any>
-    class: Class
 }
 
 export interface Guard {
@@ -50,3 +48,8 @@ export interface Guard {
 }
 
 export type InstanceOf<T extends new (...args: any[]) => any> = InstanceType<T>;
+
+export type AppOptions = {
+    logger: boolean
+    overloadHandlers: boolean
+}

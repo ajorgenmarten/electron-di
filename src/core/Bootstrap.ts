@@ -1,5 +1,5 @@
 import { ipcMain, IpcMainEvent, IpcMainInvokeEvent } from "electron";
-import { Class, ExecutionContext, Guard, InstanceOf, ParamMetadata, Provider, Token } from "../types";
+import { AppOptions, Class, ExecutionContext, Guard, InstanceOf, ParamMetadata, Provider, Token } from "../types";
 import { ControllerRegister, DependencyContainer } from "./Container";
 import ReflectionHandler from "./ReflectionHandler";
 import { Logger } from "./Logger";
@@ -23,8 +23,13 @@ class ParamResolver {
 
 class App {
     private Logger = Logger.Logger
-    constructor(private container: DependencyContainer) {
+    private options: AppOptions = {
+        logger: false,
+        overloadHandlers: false
+    }
+    constructor(private container: DependencyContainer, options?: AppOptions) {
         this.RegisterHandlers()
+        if (options) this.options = {...this.options, ...options}
     }
 
     /**
@@ -91,13 +96,11 @@ class App {
                            controllerClass: Class, stack_before_guards: Guard[], stack_after_guards: Guard[]) {
         
         return async (event: IpcMainInvokeEvent | IpcMainEvent, payload: any) => {
-            this.Logger.info(`[REQUESTED: ${full_channel}] -> (${controllerClass.name}.${method})`)
+            this.options.logger && this.Logger.info(`[REQUESTED: ${full_channel}] -> (${controllerClass.name}.${method})`)
             
             const context: ExecutionContext = {
                 ipcEvent: event,
-                payload: payload,
-                handler: controllerInstance[method],
-                class: controllerInstance
+                payload: payload
             }
 
             // Ejecutar guardias previos
@@ -144,8 +147,7 @@ class App {
             const params = ReflectionHandler.getParamsMetadata(guard as any, 'execute')
             return guard.execute(...ParamResolver.resolve(context, params))
         })).catch(error => {
-            this.handleError(error, channel)
-            return { success: false }
+            return this.handleError(error, channel)
         })
     }
 
@@ -207,7 +209,7 @@ class App {
                 const full_channel = [controllerInfo.Prefix, handler_metadata.channel].filter(Boolean).join(':')
             
                 // Verificar duplicados
-                if(ipcMain.listeners(full_channel).length > 0) {
+                if(ipcMain.listeners(full_channel).length > 0 && this.options.overloadHandlers === false) {
                     throw new Error(`Duplicate handler for channel: "${full_channel}"`)
                 }
 

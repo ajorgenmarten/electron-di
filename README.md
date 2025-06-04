@@ -46,6 +46,20 @@ export default defineConfig({
 })
 ```
 
+## Configuración
+
+Habilite decoradores en tsconfig.json. Para utilizar este paquete correctamente, debes habilitar los decoradores en tu archivo `tsconfig.json`
+
+```json
+{
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    // ... otras opciones
+  }
+}
+```
+
 ## Uso básico
 
 ```js

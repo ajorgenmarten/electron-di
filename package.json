@@ -1,6 +1,6 @@
 {
-  "name": "electron-di2",
-  "version": "1.0.0",
+  "name": "electron-di",
+  "version": "3.0.0",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -22,9 +22,13 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ajorgenmarten/electron-di2.git"
+    "url": "git+https://github.com/ajorgenmarten/electron-di.git"
   },
-  "author": "Alejandro Jorgen Martén",
+  "author": {
+    "name": "Alejandro Jorgen Martén",
+    "email": "ajorgenmarten35@gmail.com",
+    "url": "https:/github.com/ajorgenmarten"
+  },
   "license": "MIT",
   "description": "Util para brindar a tu aplicación de electron la capacidad de ser construida con un código limpio y mantenible.",
   "devDependencies": {

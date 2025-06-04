@@ -39,6 +39,25 @@ class App {
     /**
      * Extrae y organiza los guardias de un controlador y método
      */
+    // Cachear los guardias resueltos para evitar resoluciones repetidas
+    private guardsCache: Map<string, Guard> = new Map();
+    
+    private resolveGuard(guard: Token<Guard>, scopeModule: Class, controllerClass: Class, method?: string): Guard {
+        const cacheKey = `${guard.name}_${scopeModule.name}_${controllerClass.name}_${method || ''}`;
+        
+        if (this.guardsCache.has(cacheKey)) {
+            return this.guardsCache.get(cacheKey)!;
+        }
+        
+        const resolvedGuard = this.container.resolve(guard, scopeModule, {
+            target: controllerClass,
+            property: method
+        });
+        
+        this.guardsCache.set(cacheKey, resolvedGuard);
+        return resolvedGuard;
+    }
+
     private extractGuards(controllerInstance: any, method: string, controllerInfo: ControllerRegister, controllerClass: Class) {
         const [after_guards, before_guards] = ReflectionHandler.getGuardsMetadata(controllerInstance, method)
             .reverse()
@@ -49,15 +68,11 @@ class App {
             }, [[], []] as [Token<Guard>[], Token<Guard>[]])
 
         const controller_guard_resolver = (guard: Token<Guard>) => {
-            return this.container.resolve(guard, controllerInfo.ScopeModule, {
-                target: controllerClass
-            })
+            return this.resolveGuard(guard, controllerInfo.ScopeModule, controllerClass);
         }
         
         const handler_guard_resolver = (guard: Token<Guard>) => {
-            return this.container.resolve(guard, controllerInfo.ScopeModule, {
-                target: controllerClass, property: method
-            })
+            return this.resolveGuard(guard, controllerInfo.ScopeModule, controllerClass, method);
         }
 
         const stack_after_guards = [...Array.from(controllerInfo.BeforeGuards).map(controller_guard_resolver), 
@@ -146,19 +161,38 @@ class App {
     /**
      * Registra los manejadores para todos los controladores
      */
+    // Inicializar controladores de forma más eficiente
+    private initializeControllers() {
+        const controllers = Array.from(this.container.Controllers);
+        const initializedControllers = new Map<Class, any>();
+        
+        // Inicializar todos los controladores primero
+        for (const [controllerClass, controllerInfo] of controllers) {
+            const dependencies = controllerInfo.Dependencies.map(dep => 
+                this.container.resolve(dep, controllerInfo.ScopeModule, { target: controllerClass })
+            );
+            
+            initializedControllers.set(controllerClass, new controllerClass(...dependencies));
+        }
+        
+        return initializedControllers;
+    }
+    
     private RegisterHandlers() {
-        const controllers = Array.from(this.container.Controllers)
-
-        for(const [controller_class, controller_info] of controllers) {
+        const controllers = Array.from(this.container.Controllers);
+        const initializedControllers = this.initializeControllers();
+        
+        for (const [controllerClass, controllerInfo] of controllers) {
+            const controllerInstance = initializedControllers.get(controllerClass);
             // Obtener métodos del controlador
-            const methods = Object.getOwnPropertyNames(controller_class.prototype).filter(name => name !== 'constructor')
+            const methods = Object.getOwnPropertyNames(controllerClass.prototype).filter(name => name !== 'constructor')
 
             // Resolver dependencias del controlador
-            const dependencies_resolver = this.createDependencyResolver(controller_class, controller_info.ScopeModule)
-            const controller_dependencies = controller_info.Dependencies.map(dependencies_resolver)
+            const dependencies_resolver = this.createDependencyResolver(controllerClass, controllerInfo.ScopeModule)
+            const controller_dependencies = controllerInfo.Dependencies.map(dependencies_resolver)
             
             // Instanciar el controlador
-            const controller_instance = new controller_class(...controller_dependencies)
+            const controller_instance = new controllerClass(...controller_dependencies)
 
             // Procesar cada método del controlador
             for(const method of methods) {
@@ -167,10 +201,10 @@ class App {
 
                 // Extraer y organizar guardias
                 const { stack_after_guards, stack_before_guards } = 
-                    this.extractGuards(controller_instance, method, controller_info, controller_class)
+                    this.extractGuards(controller_instance, method, controllerInfo, controllerClass)
 
                 // Construir el canal completo
-                const full_channel = [controller_info.Prefix, handler_metadata.channel].filter(Boolean).join(':')
+                const full_channel = [controllerInfo.Prefix, handler_metadata.channel].filter(Boolean).join(':')
             
                 // Verificar duplicados
                 if(ipcMain.listeners(full_channel).length > 0) {
@@ -180,7 +214,7 @@ class App {
                 // Crear y registrar el manejador IPC
                 const ipc_handler = this.createIpcHandler(
                     controller_instance, method, full_channel, 
-                    controller_class, stack_before_guards, stack_after_guards
+                    controllerClass, stack_before_guards, stack_after_guards
                 )
                 
                 if (handler_metadata.type === "invoke") {

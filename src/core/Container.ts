@@ -26,7 +26,7 @@ export class DependencyContainer {
     private globals: Map<Class, ModuleRegister> = new Map();
     private modules: Map<Class, ModuleRegister> = new Map();
     private providers: Map<Token, ProviderRegister> = new Map();
-    private instances: Map<Token, Class> = new Map();
+    private instances: WeakMap<Token, Class> = new WeakMap();
     private controllers: Map<Class, ControllerRegister> = new Map();
 
     constructor(module: Class) {
@@ -90,29 +90,46 @@ export class DependencyContainer {
         this.controllers.set(controller, controller_info)
     }
 
+    // Agregar un caché de resolución para evitar recálculos
+    private resolutionCache: Map<string, boolean> = new Map();
+    
+    private getCacheKey(token: Token, root: Class, scope: Class): string {
+        return `${token.name}_${root.name}_${scope.name}`;
+    }
+    
     private check_scope_access(token: Token, root: Class, scope: Class) {
-        if (root === scope && this.modules.get(root)?.Providers.has(token)) return true
+        const cacheKey = this.getCacheKey(token, root, scope);
+        if (this.resolutionCache.has(cacheKey)) {
+            return this.resolutionCache.get(cacheKey);
+        }
+        
+        if (root === scope && this.modules.get(root)?.Providers.has(token)) {
+            this.resolutionCache.set(cacheKey, true);
+            return true;
+        }
         
         const modules = this.modules.get(root)?.Imports
-
+    
         if (!modules) return false
-
+    
         for( const module of modules) {
             if (this.globals.has(module)) continue;
-
+    
             const module_registered = this.modules.get(module) as ModuleRegister
-
+    
             const [in_providers, in_exports] = [
                 module_registered.Providers.has(token),
                 module_registered.Exports.has(token)
             ]
             
             if (in_providers && in_exports) return true
-
+    
             if (in_exports && this.check_scope_access(token, root, module)) return true 
         }
-
-        return false
+    
+        // Almacenar el resultado en caché antes de retornar
+        this.resolutionCache.set(cacheKey, false);
+        return false;
     }
     
     private check_global_access(token: Token) {

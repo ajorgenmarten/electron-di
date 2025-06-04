@@ -14,7 +14,7 @@ type ModuleRegister = {
     Exports: Set<Token>
 }
 
-type ControllerRegister = {
+export type ControllerRegister = {
     Prefix: string
     AfterGuards: Set<Token<Guard>>
     BeforeGuards: Set<Token<Guard>>

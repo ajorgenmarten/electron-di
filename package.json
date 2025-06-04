@@ -1,6 +1,6 @@
 {
-  "name": "electron-di2",
-  "version": "1.0.0",
+  "name": "electron-di",
+  "version": "3.0.0",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -22,7 +22,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ajorgenmarten/electron-di2.git"
+    "url": "git+https://github.com/ajorgenmarten/electron-di.git"
   },
   "author": {
     "name": "Alejandro Jorgen Martén",

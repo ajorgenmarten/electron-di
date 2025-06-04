@@ -1,4 +1,4 @@
-import { Class, ControllerMetadata, HandlerMetadata, InjectableMetadata, MiddlewareMetadata, ModuleMetadata, Provider, Token } from "../types";
+import { Class, ControllerMetadata, HandlerMetadata, InjectableMetadata, GuardMetadata, ModuleMetadata, ParamMetadata, Provider, Token } from "../types";
 import { SYMBOLS } from "./Symbols";
 
 export default class ReflectionHandler {
@@ -22,14 +22,17 @@ export default class ReflectionHandler {
         const metadata: InjectableMetadata = Reflect.getMetadata(SYMBOLS.provider, cls)
         return metadata;
     }
-    static getMiddlewareMetadata(cls: Class, property?: string): MiddlewareMetadata[] {
-        const metadata = Reflect.getMetadata(SYMBOLS.middleware, cls, property as string) || [] as MiddlewareMetadata[];
+    static getGuardsMetadata(cls: Class, property?: string): GuardMetadata[] {
+        const metadata = Reflect.getMetadata(SYMBOLS.middleware, cls, property as string) || [] as GuardMetadata[];
         return metadata
     }
-    static getProviderMetadata(provider: Provider) {
-        const cls = typeof provider === 'object' ? provider.useClass : provider;
-        const metadata: boolean = Reflect.getMetadata(SYMBOLS.provider, cls)
-        return metadata;
+    static getHandlerMetadata(cls: Class, property: string): HandlerMetadata | undefined {
+        const metadata = Reflect.getMetadata(SYMBOLS.handler, cls, property)
+        return metadata
+    }
+    static getParamsMetadata(cls: Class, property: string): ParamMetadata {
+        const metadata = Reflect.getMetadata(SYMBOLS.params, cls, property) as ParamMetadata || []
+        return metadata
     }
     // METADATA SETTERS
     static setInjectableMetadata(metadata: InjectableMetadata, target: Class) {
@@ -38,8 +41,8 @@ export default class ReflectionHandler {
     static setControllerMetadata(metadata: ControllerMetadata, target: Class) {
         Reflect.defineMetadata(SYMBOLS.controller, metadata, target)
     }
-    static setMiddlewareMetadata(metadata: MiddlewareMetadata, target: Class, propertyKey?: string) {
-        const middlewareMetadata = this.getMiddlewareMetadata(target, propertyKey)
+    static setGuardMetadata(metadata: GuardMetadata, target: Class, propertyKey?: string) {
+        const middlewareMetadata = this.getGuardsMetadata(target, propertyKey)
         middlewareMetadata.push(metadata)
         Reflect.defineMetadata(SYMBOLS.middleware, middlewareMetadata, target, propertyKey as string)
     }
@@ -51,5 +54,10 @@ export default class ReflectionHandler {
     }
     static setGlobalMetadata(metadata: boolean, target: Class) {
         Reflect.defineMetadata(SYMBOLS.global, metadata, target)
+    }
+    static setParamMetadata(metadata: ParamMetadata[0], target: Class, propertyKey: string, paramIndex: number) {
+        const paramsMetadata = this.getParamsMetadata(target, propertyKey)
+        paramsMetadata[paramIndex] = metadata
+        Reflect.defineMetadata(SYMBOLS.params, paramsMetadata, target, propertyKey)
     }
 }

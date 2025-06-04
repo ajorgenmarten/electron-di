@@ -1,10 +1,8 @@
-import { SYMBOLS } from "../core/Symbols"
-import { ParamMetadata } from "../types"
+import ReflectionHandler from "../core/ReflectionHandler"
+import { Class } from "../types"
 
 export function Request(): ParameterDecorator {
     return function (target, propertyKey, paramIndex) {
-        const metadata: ParamMetadata = Reflect.getMetadata(SYMBOLS.params, target, propertyKey as string) || []
-        metadata[paramIndex] = "request"
-        Reflect.defineMetadata(SYMBOLS.params, metadata, target, propertyKey as string)
+        ReflectionHandler.setParamMetadata('request', target as Class, propertyKey as string, paramIndex)
     }
 }

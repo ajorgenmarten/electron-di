@@ -1,7 +1,12 @@
-export function applyDecorators(...decorators: (ClassDecorator | MethodDecorator )[] ): ClassDecorator | MethodDecorator {
-    return function (target, propertyKey, propertyDescriptor) {
+export function applyDecorator(...decorators: (ClassDecorator | MethodDecorator)[]) {
+    return (target: Object | Function, property?: string | undefined, descriptor?: PropertyDescriptor) => {
         for(const decorator of decorators) {
-            (decorator as MethodDecorator)(target, propertyKey, propertyDescriptor)
+            if (!property && !descriptor) {
+                (decorator as ClassDecorator)(target as Function)
+            }
+            if (descriptor && typeof descriptor !== 'number') {
+                (decorator as MethodDecorator)(target, property as string, descriptor)
+            }
         }
     }
 }

@@ -1,9 +1,8 @@
-import { SYMBOLS } from "../core/Symbols"
+import ReflectionHandler from "../core/ReflectionHandler"
+import { Class } from "../types"
 
 export function Event(): ParameterDecorator {
     return function(target, propertyKey, paramIndex) {
-        const params = Reflect.getMetadata(SYMBOLS.params, target, propertyKey as string) || []
-        params[paramIndex] = "event"
-        Reflect.defineMetadata(SYMBOLS.params, params, target, propertyKey as string)
+        ReflectionHandler.setParamMetadata('event', target as Class, propertyKey as string, paramIndex)
     }
 }

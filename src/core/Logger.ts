@@ -1,115 +1,141 @@
-const COLORS = {
-  BACKGROUND: {
-    LIGHT: {
-      BLACK: "100",
-      RED: "101",
-      GREEN: "102",
-      YELLOW: "103",
-      BLUE: "104",
-      MAGENTA: "105",
-      CYAN: "106",
-      WHITE: "107",
-      DEFAULT: "109",
-    },
-    DARK: {
-      BLACK: "40",
-      RED: "41",
-      GREEN: "42",
-      YELLOW: "43",
-      BLUE: "44",
-      MAGENTA: "45",
-      CYAN: "46",
-      WHITE: "47",
-      DEFAULT: "49",
-    },
-  },
-  FOREGROUND: {
-    LIGHT: {
-      BLACK: "90",
-      RED: "91",
-      GREEN: "92",
-      YELLOW: "93",
-      BLUE: "94",
-      MAGENTA: "95",
-      CYAN: "96",
-      WHITE: "97",
-      DEFAULT: "99",
-    },
-    DARK: {
-      BLACK: "30",
-      RED: "31",
-      GREEN: "32",
-      YELLOW: "33",
-      BLUE: "34",
-      MAGENTA: "35",
-      CYAN: "36",
-      WHITE: "37",
-      DEFAULT: "39",
-    },
-  },
-};
+// Tipos para niveles de log
+type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'critical';
+type LogColor = 'reset' | 'red' | 'green' | 'yellow' | 'blue' | 'magenta' | 'cyan';
 
-type ColorFor = keyof typeof COLORS;
-type ColorType = keyof (typeof COLORS)[ColorFor];
-type ColorValue = keyof (typeof COLORS)[ColorFor][ColorType];
-interface ThemeProps {
-  font?: { colorType: ColorType; colorValue: ColorValue };
-  background?: { colorType: ColorType; colorValue: ColorValue };
-}
-interface CustomLoggerProps {
-  title: ThemeProps;
-  message: ThemeProps;
+// Configuración del logger
+interface LoggerConfig {
+  showTimestamp?: boolean;
+  timestampFormat?: 'local' | 'iso' | 'unix';
+  minLevel?: LogLevel;
+  colors?: boolean;
 }
 
-const genTheme = ({ font, background }: ThemeProps) => {
-  const theme = [
-    font ? COLORS.FOREGROUND[font.colorType][font.colorValue] : undefined,
-    background
-      ? COLORS.BACKGROUND[background.colorType][background.colorValue]
-      : undefined,
-  ]
-    .filter(Boolean)
-    .join(";");
-  return theme ? `\x1b[${theme}m[%s]\x1b[0m` : `%s`;
+// Códigos de color ANSI
+const COLORS: Record<LogLevel, LogColor> = {
+  debug: 'cyan',
+  info: 'green',
+  warn: 'yellow',
+  error: 'red',
+  critical: 'magenta'
 };
 
-const THEMES = {
-  log: genTheme({ font: { colorType: "LIGHT", colorValue: "BLACK" } }),
-  success: genTheme({ font: { colorType: "LIGHT", colorValue: "GREEN" } }),
-  error: genTheme({ font: { colorType: "LIGHT", colorValue: "RED" } }),
-  info: genTheme({ font: { colorType: "LIGHT", colorValue: "BLUE" } }),
-  warn: genTheme({ font: { colorType: "LIGHT", colorValue: "YELLOW" } }),
+const COLOR_CODES: Record<LogColor, string> = {
+  reset: '\x1b[0m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m'
+};
+
+// Niveles de log ordenados por importancia
+const LOG_LEVELS: Record<LogLevel, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+  critical: 4
 };
 
 export class Logger {
-  static log(message: string, title: string = "ELECTRON DI", ...args: any[]) {
-    console.log(`${THEMES.log}: ${message}`, title, ...args);
+  private config: LoggerConfig = {
+    showTimestamp: true,
+    timestampFormat: 'local',
+    minLevel: 'info',
+    colors: true
+  };
+
+  constructor(config?: LoggerConfig) {
+    this.config = { ...this.config, ...config };
   }
-  static info(message: string, title: string = "ELECTRON DI", ...args: any[]) {
-    console.log(`${THEMES.info}: ${message}`, title, ...args);
+
+  static get Logger() {
+    return new Logger({
+      minLevel: 'debug', // Mostrar todos los niveles
+      colors: true,      // Habilitar colores
+      timestampFormat: 'local'
+    });
   }
-  static success(
-    message: string,
-    title: string = "ELECTRON DI",
-    ...args: any[]
-  ) {
-    console.log(`${THEMES.success}: ${message}`, title, ...args);
+
+  // Función principal de logging
+  private log(level: LogLevel, message: string, ...args: any[]): void {
+    // Verificar nivel mínimo
+    if (LOG_LEVELS[level] < LOG_LEVELS[this.config.minLevel!]) return;
+
+    // Crear partes del mensaje
+    const parts: string[] = [];
+
+    // Agregar timestamp si está habilitado
+    if (this.config.showTimestamp) {
+      parts.push(this.formatTimestamp());
+    }
+
+    // Agregar nivel con color si está habilitado
+    const levelStr = `[${level.toUpperCase()}]`;
+    parts.push(this.config.colors 
+      ? `${COLOR_CODES[COLORS[level]]}${levelStr}${COLOR_CODES.reset}` 
+      : levelStr);
+
+    // Agregar mensaje
+    parts.push(message);
+
+    // Determinar función de console
+    const consoleMethod = this.getConsoleMethod(level);
+
+    // Imprimir el mensaje
+    if (args.length > 0) {
+      consoleMethod(parts.join(' '), ...args);
+    } else {
+      consoleMethod(parts.join(' '));
+    }
   }
-  static error(message: string, title: string = "ELECTRON DI", ...args: any[]) {
-    console.log(`${THEMES.error}: ${message}`, title, ...args);
+
+  // Formatear timestamp según configuración
+  private formatTimestamp(): string {
+    const now = new Date();
+    
+    switch (this.config.timestampFormat) {
+      case 'iso':
+        return `[${now.toISOString()}]`;
+      case 'unix':
+        return `[${Math.floor(now.getTime() / 1000)}]`;
+      case 'local':
+      default:
+        return `[${now.toLocaleString()}]`;
+    }
   }
-  static warn(message: string, title: string = "ELECTRON DI", ...args: any[]) {
-    console.log(`${THEMES.warn}: ${message}`, title, ...args);
+
+  // Obtener el método de console adecuado
+  private getConsoleMethod(level: LogLevel): (...args: any[]) => void {
+    switch (level) {
+      case 'debug': return console.debug;
+      case 'info': return console.info;
+      case 'warn': return console.warn;
+      case 'error': return console.error;
+      case 'critical': return console.error;
+      default: return console.log;
+    }
   }
-  static customLogger(options: CustomLoggerProps) {
-    const titleTheme = genTheme(options.title);
-    const messageTheme = genTheme(options.message);
-    return function (
-      message: string,
-      title: string = "LOGGER",
-      ...args: any[]
-    ) {
-      console.log(`${titleTheme}: ${messageTheme}`, title, message, ...args);
-    };
+
+  // Métodos públicos para cada nivel
+  public debug(message: string, ...args: any[]): void {
+    this.log('debug', message, ...args);
+  }
+
+  public info(message: string, ...args: any[]): void {
+    this.log('info', message, ...args);
+  }
+
+  public warn(message: string, ...args: any[]): void {
+    this.log('warn', message, ...args);
+  }
+
+  public error(message: string, ...args: any[]): void {
+    this.log('error', message, ...args);
+  }
+
+  public critical(message: string, ...args: any[]): void {
+    this.log('critical', message, ...args);
   }
 }

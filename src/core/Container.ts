@@ -1,5 +1,6 @@
-import { Class, InjectableMetadata, Provider, Token } from "../types"
+import { Class, InjectableMetadata, Provider, Token, GuardMetadata, Guard, InstanceOf } from "../types"
 import ReflectionHandler from "./ReflectionHandler";
+import { Reflector } from "./Reflector";
 
 type ProviderRegister = {
     ScopeModule: Class
@@ -13,11 +14,20 @@ type ModuleRegister = {
     Exports: Set<Token>
 }
 
+type ControllerRegister = {
+    Prefix: string
+    AfterGuards: Set<Token<Guard>>
+    BeforeGuards: Set<Token<Guard>>
+    Dependencies: Token[]
+    ScopeModule: Class
+}
+
 export class DependencyContainer {
     private globals: Map<Class, ModuleRegister> = new Map();
     private modules: Map<Class, ModuleRegister> = new Map();
     private providers: Map<Token, ProviderRegister> = new Map();
     private instances: Map<Token, Class> = new Map();
+    private controllers: Map<Class, ControllerRegister> = new Map();
 
     constructor(module: Class) {
         this.register(module)
@@ -42,6 +52,8 @@ export class DependencyContainer {
         
         module_metadata.providers?.forEach(provider => { this.register_provider(provider, module) })
 
+        module_metadata.controllers?.forEach(controller => { this.register_controller(controller, module) })
+
     }
 
     private register_provider(provider: Provider, scope_module: Class) {
@@ -53,6 +65,29 @@ export class DependencyContainer {
         if (!options) throw new Error(`Class "${cls.name}" is not injectable`)
 
         this.providers.set(token, { Options: options, Value: cls, ScopeModule: scope_module })
+    }
+
+    private register_controller(controller: Class, scope_module: Class) {
+        if (this.controllers.has(controller)) return
+
+        const metadata = ReflectionHandler.getControllerMetadata(controller)
+        if (!metadata) throw new Error(`Class "${controller.name}" is not a controller`)
+
+        const [afters, befores] = ReflectionHandler.getGuardsMetadata(controller).reverse().reduce((p, c) => {
+            if (c.type === 'after') p[0].push(c)
+            else p[1].push(c)
+            return p
+        }, [[], []] as [GuardMetadata[], GuardMetadata[]])
+
+        const controller_info: ControllerRegister = {
+            Prefix: metadata.prefix || "",
+            AfterGuards: new Set(afters.map(m => m.token)),
+            BeforeGuards: new Set(befores.map(m => m.token)),
+            Dependencies: ReflectionHandler.getParamTypes(controller),
+            ScopeModule: scope_module
+        }
+
+        this.controllers.set(controller, controller_info)
     }
 
     private check_scope_access(token: Token, root: Class, scope: Class) {
@@ -117,7 +152,8 @@ export class DependencyContainer {
     // 2. Debe estar registrado y exportado en un modulo global
     // 3. Debe estar registrado y exportdao en un modulo importado
     */
-    resolve<T>(token: Token<T>, scope: Class): Class<T> {
+    resolve<T>(token: Token<T>, scope: Class, context?: { target: Class, property?: string }): InstanceOf<any> {
+        if (token === Reflector && context) return new Reflector(context.target, context?.property)
         const provider = this.providers.get(token)
         if (!provider) throw new Error(`Class "${token.name}" has been not provided`)
 
@@ -129,7 +165,7 @@ export class DependencyContainer {
         }
 
         const injections = ReflectionHandler.getParamTypes(provider.Value)
-        const dependencies = injections.map(depToken => this.resolve(depToken, provider.ScopeModule))
+        const dependencies = injections.map(depToken => this.resolve(depToken, provider.ScopeModule, context ))
 
         const instance = new provider.Value(...dependencies)
 
@@ -154,5 +190,9 @@ export class DependencyContainer {
 
     get Providers() {
         return this.providers
+    }
+
+    get Controllers() {
+        return this.controllers
     }
 }

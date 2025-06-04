@@ -5,5 +5,6 @@ export const SYMBOLS = {
     global: Symbol('electron:global'),
     middleware: Symbol('electron:middleware'),
     params: Symbol('electron:param'),
-    handler: Symbol('electron:handler')
+    handler: Symbol('electron:handler'),
+    reflector: Symbol('electron:reflector')
 }

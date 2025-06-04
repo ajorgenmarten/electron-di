@@ -31,18 +31,22 @@ export type HandlerMetadata = {
     channel: string
 }
 
-export type MiddlewareMetadata = {
+export type GuardMetadata = {
     type: "after" | "before"
     token: Token
 }
 
-export type ParamMetadata = ("event"|"payload"|"request"|"response")[]
+export type ParamMetadata = ("event"|"payload"|"request")[]
 
 export type ExecutionContext = {
     ipcEvent: IpcMainInvokeEvent | IpcMainEvent
     payload: any
+    handler: InstanceOf<any>
+    class: Class
 }
 
-export interface Middleware {
+export interface Guard {
     execute(...args: any[]): void | boolean | Promise<void | boolean>
 }
+
+export type InstanceOf<T extends new (...args: any[]) => any> = InstanceType<T>;

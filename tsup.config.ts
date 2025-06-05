@@ -8,7 +8,4 @@ export default defineConfig({
   dts: true,                // Genera archivos .d.ts
   clean: true,              // Limpia la carpeta de salida
   skipNodeModulesBundle: true, // No empaqueta node_modules
-  esbuildOptions(options) {
-    options.external = ['electron', 'reflect-metadata']; // No empaquetar electron ni reflect-metadata
-  },
 });

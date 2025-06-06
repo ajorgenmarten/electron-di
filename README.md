@@ -151,3 +151,54 @@ Esto permite:
 - Mantener un acoplamiento bajo entre componentes
 - Gestionar el alcance de los servicios (global vs módulo específico)
 - Facilitar las pruebas unitarias
+
+## Controladores
+
+### 🦩 ¿Qué es un Controlador?
+
+En este framework, un Controlador es una clase que agrupa métodos para manejar eventos IPC `(ipcMain)` en Electron. Define canales lógicos donde se recibe comunicación desde el proceso renderer.
+
+🔧 Decorador: `@Controller('prefijoOpcional')`
+
+```ts
+import { Controller } from 'mi-paquete-di';
+
+@Controller('user')
+export class UserController {
+    // Métodos
+}
+```
+El prefijo define el "namespace" para todos los canales que maneja ese controlador.
+
+### 🚀 Cómo manejar eventos IPC
+
+Existen dos decoradores para enlazar métodos con eventos:
+
+| Decorador | Tipo de evento | Descripción                              |
+|-----------|----------------|------------------------------------------|
+|`@OnInvoke`|`ipcMain.handle`|Comunicación basada en promesas (`invoke`)|
+|`@OnSend`  |`ipcMain.on`    |Comunicación tipo emit (`sin respuesta`)  |
+
+#### Ejemplo:
+```ts
+import { Controller, OnInvoke, OnSend, Event, Payload } from 'electron-di';
+
+@Controller('user')
+export class UserController {
+  
+    @OnInvoke('create')
+    async createUser(@Event() event, @Payload() payload) {
+        // lógica de creación
+        return { success: true, data: payload };
+    }
+
+    @OnSend('notify')
+    notifyUser(@Event() event, @Payload() payload) {
+        // lógica de notificación
+    }
+}
+```
+
+#### Resultado:
+- user:create → manejado con invoke
+- user:notify → manejado con on

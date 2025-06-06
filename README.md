@@ -425,3 +425,5 @@ export default class SecurityController {
   }
 }
 ```
+
+Creado con ❤️ por [Alejandro Jorgen Martén](https://github.com/ajorgenmarten)

@@ -2,6 +2,10 @@
 
 `electron-di` enhances dependency management in Electron applications, facilitating service injection and code modularity. It allows decoupling components and simplifying tests, making development more maintainable and scalable.
 
+## Translations
+
+Traducción a [Español](https://github.com/ajorgenmarten/electron-di/blob/main/README.md)
+
 ## Installation
 
 ```bash

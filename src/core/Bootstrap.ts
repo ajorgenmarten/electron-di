@@ -236,8 +236,8 @@ class App {
 }
 
 export class ElectronDI {
-    static createApp(MainModule: Class) {
-        const app = new App(new DependencyContainer(MainModule))
+    static createApp(MainModule: Class, options?: AppOptions) {
+        const app = new App(new DependencyContainer(MainModule), options)
         return app;
     }
 }

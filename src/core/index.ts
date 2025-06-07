@@ -1,3 +1,5 @@
 export * from './Bootstrap'
-export * from './Logger'
+export * from './Container'
 export * from './Reflector'
+export * from './MetadataHandler'
+export * from './types'

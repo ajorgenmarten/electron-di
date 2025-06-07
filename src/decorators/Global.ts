@@ -1,8 +1,8 @@
-import ReflectionHandler from "../core/ReflectionHandler"
-import { Class } from "../types"
+import { Class, MetadataHandler } from "../core"
+
 
 export function Global(): ClassDecorator {
     return function (target: Object) {
-        ReflectionHandler.setGlobalMetadata(true, target as Class)
+        MetadataHandler.SetGlobalMetadata(target as Class, true)
     }
 }

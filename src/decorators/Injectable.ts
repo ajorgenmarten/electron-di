@@ -1,8 +1,7 @@
-import ReflectionHandler from "../core/ReflectionHandler"
-import { Class, InjectableMetadata } from "../types"
+import { Class, InjectableMetadata, MetadataHandler } from "../core"
 
-export function Injectable(options: InjectableMetadata = { scope: 'singleton' }): ClassDecorator {
+export function Injectable(options?: InjectableMetadata): ClassDecorator {
     return function (target: Object) {
-        ReflectionHandler.setInjectableMetadata(options, target as Class)
+        MetadataHandler.SetInjectableMetadata(target as Class, { scope: 'singleton', ...options })
     }
 }

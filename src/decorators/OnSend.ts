@@ -1,12 +1,12 @@
-import ReflectionHandler from "../core/ReflectionHandler"
-import { Class, HandlerMetadata } from "../types"
+import { Class, HandlerMetadata, MetadataHandler } from "../core"
+
 
 export function OnSend(channel: string): MethodDecorator {
-    return function (target: Object, propertyKey, descriptor) {
+    return function (target: Object, propertyKey) {
         const metadata: HandlerMetadata = {
             channel,
             type: "send",
         }
-        ReflectionHandler.setHandlerMetadata(metadata, target as Class, propertyKey as string)
+        MetadataHandler.SetHandlerMetadata(target as Class, propertyKey as string, metadata)
     }
 }

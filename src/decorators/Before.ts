@@ -1,14 +1,13 @@
-import ReflectionHandler from "../core/ReflectionHandler"
-import { Class, GuardMetadata, Token } from "../types"
+import { Class, GuardMetadata, MetadataHandler, Token } from "../core"
 
 export function Before(...guards: Token[]): ClassDecorator | MethodDecorator {
     return function (target, propertyKey) {
-        for(const gds of guards) {
+        for(const mdl of guards) {
             const metadata: GuardMetadata = {
-                token: gds,
-                type: 'before'
+                provider: mdl,
+                type: 'after'
             }
-            ReflectionHandler.setGuardMetadata(metadata, target as Class, propertyKey as string)
+            MetadataHandler.SetGuardMetadata(target as Class, metadata, propertyKey as string)
         }
     }
 }

@@ -1,8 +1,8 @@
-import ReflectionHandler from "../core/ReflectionHandler"
-import { Class } from "../types"
+import { Class, MetadataHandler } from "../core"
+
 
 export function Event(): ParameterDecorator {
     return function(target, propertyKey, paramIndex) {
-        ReflectionHandler.setParamMetadata('event', target as Class, propertyKey as string, paramIndex)
+        MetadataHandler.SetParamsMetadata(target as Class, propertyKey as string, paramIndex, 'event')
     }
 }

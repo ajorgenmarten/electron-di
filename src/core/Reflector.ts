@@ -1,35 +1,24 @@
-import { Class } from "../types";
-import { SYMBOLS } from "./Symbols";
+import { MetadataHandler } from "./MetadataHandler";
+import { Class } from "./types";
 
 export class Reflector {
-    constructor(private target: Class, private propertyKey?: string | undefined) {}
+    constructor(private cls: Class, private handler?: string) {}
 
-    getClassMetadata(key: string) {
-        const metadata = Reflect.getMetadata(SYMBOLS.reflector, this.target) || {}
-        return metadata[key]
+    get(key: string) {
+        if (this.handler) return MetadataHandler.get(key, { cls: this.cls, method: this.handler})
+        return MetadataHandler.get(key, { cls: this.cls.constructor as Class })
     }
 
-    getHandlerMetadata(key: string) {
-        if (!this.propertyKey) return undefined
-        const metadata = Reflect.getMetadata(SYMBOLS.reflector, this.target.prototype, this.propertyKey) || {}
-        return metadata[key]
-    }
-
-    getMetadata(key: string) {
-        const handler_metadata = this.getHandlerMetadata(key)
-        if (handler_metadata) return handler_metadata
-        const class_metadata = this.getClassMetadata(key)
-        return class_metadata
-    }
-
-    getAllOverrideMetadata(key: string) {
-        const handler_metadata = this.getHandlerMetadata(key)
-        const class_metadata = this.getClassMetadata(key)
-        return [handler_metadata, class_metadata]
+    getInControllerContext(key: string) {
+        return MetadataHandler.get(key, { cls: this.handler ? this.cls.constructor as Class : this.cls })
     }
     
-    updateContext(target: Class, propertyKey?: string | undefined) {
-        this.target = target
-        this.propertyKey = propertyKey
+    getAllMerged(key: string) {
+        if (this.handler) {
+            const handlerMetadata = MetadataHandler.get(key, { cls: this.cls, method: this.handler })
+            const controllerMetadata = MetadataHandler.get(key, { cls: this.cls.constructor as Class})
+            return [controllerMetadata, handlerMetadata]
+        }
+        else return MetadataHandler.get(key, { cls: this.cls })
     }
 }

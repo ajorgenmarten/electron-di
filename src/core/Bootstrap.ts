@@ -142,7 +142,7 @@ class Application {
             
             try {
                 const params = MetadataHandler.GetParamsMetadata(props.controllerInstance, props.method) || []
-                result = props.controllerInstance[props.method](...this.resolveParams(params, executionContext))
+                result = await props.controllerInstance[props.method](...this.resolveParams(params, executionContext))
             } catch (error) {
                 return this.handleError(error, props.fullChannel)
             }

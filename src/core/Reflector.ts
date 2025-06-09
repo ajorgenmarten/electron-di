@@ -9,6 +9,10 @@ export class Reflector {
         return MetadataHandler.get(key, { cls: this.cls.constructor as Class })
     }
 
+    getInHandlerContext(key: string) {
+        return MetadataHandler.get(key, { cls: this.cls.constructor as Class, method: this.handler })
+    }
+
     getInControllerContext(key: string) {
         return MetadataHandler.get(key, { cls: this.handler ? this.cls.constructor as Class : this.cls })
     }
@@ -19,6 +23,6 @@ export class Reflector {
             const controllerMetadata = MetadataHandler.get(key, { cls: this.cls.constructor as Class})
             return [controllerMetadata, handlerMetadata]
         }
-        else return MetadataHandler.get(key, { cls: this.cls })
+        else return [MetadataHandler.get(key, { cls: this.cls })]
     }
 }

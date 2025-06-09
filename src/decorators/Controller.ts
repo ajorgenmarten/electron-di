@@ -1,9 +1,9 @@
-import ReflectionHandler from "../core/ReflectionHandler"
-import { Class, ControllerMetadata } from "../types"
+import { Class, ControllerMetadata, MetadataHandler } from "../core"
+
 
 export function Controller(prefix?: string): ClassDecorator {
     return function (target: Object) {
         const metadata: ControllerMetadata = { prefix: prefix ?? "" }
-        ReflectionHandler.setControllerMetadata(metadata, target as Class)
+        MetadataHandler.SetControllerMetadata(target as Class, metadata)
     }
 }

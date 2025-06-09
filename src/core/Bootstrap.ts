@@ -1,244 +1,197 @@
 import { ipcMain, IpcMainEvent, IpcMainInvokeEvent } from "electron";
-import { AppOptions, Class, ExecutionContext, Guard, InstanceOf, ParamMetadata, Provider, Token } from "../types";
-import { ControllerRegister, DependencyContainer } from "./Container";
-import ReflectionHandler from "./ReflectionHandler";
+import { Container } from "./Container";
+import { MetadataHandler } from "./MetadataHandler";
+import { Class, GuardMetadata, Token, ParamMetadata } from "./types";
 import { Logger } from "./Logger";
 
-class ParamResolver {
-    static resolve(context: ExecutionContext, params: ParamMetadata) {
-        return params.map(param => {
-            switch(param) {
-                case "event":
-                    return context.ipcEvent
-                case "payload":
-                    return context.payload
-                case "request":
-                    return context
-                default:
-                    return null
-            }
-        })
-    }
+type InitializedControllerInfo = {
+    instance: any
+    context: Class
+    prefix: string
 }
 
-class App {
-    private Logger = Logger.Logger
-    private options: AppOptions = {
-        logger: false,
-        overloadHandlers: false
-    }
-    constructor(private container: DependencyContainer, options?: AppOptions) {
-        this.RegisterHandlers()
-        if (options) this.options = {...this.options, ...options}
-    }
+type ReflectorContext = {
+    controller: Class
+    handler?: string
+}
 
-    /**
-     * Crea un resolvedor de dependencias para un controlador específico
-     */
-    private createDependencyResolver(controllerClass: Class, scopeModule: Class) {
-        return (dep: Token) => {
-            return this.container.resolve(dep, scopeModule, { target: controllerClass })
-        }
-    }
+type ApplicationOptions = {
+    logger?: boolean
+    overloadHandlers?: boolean
+}
 
-    /**
-     * Extrae y organiza los guardias de un controlador y método
-     */
-    // Cachear los guardias resueltos para evitar resoluciones repetidas
-    private guardsCache: Map<string, Guard> = new Map();
+type CreateHandlerProps = {
+    controllerInstance: any
+    beforeGuards: any[]
+    afterGuards: any[]
+    fullChannel: string
+    method: string
+}
+
+type ExecutionContext = {
+    event: IpcMainInvokeEvent | IpcMainEvent
+    payload: any
+}
+
+class Application {
+    private guardsCache: Map<string, any> = new Map()
+    private applicationOptions: ApplicationOptions = { logger: false, overloadHandlers: false }
+    private logger = Logger.Logger
+
+    constructor(private container: Container, options?: ApplicationOptions) { 
+        this.applicationOptions = { ...this.applicationOptions, ...options }
+        this.registerHandlers()
+    }
     
-    private resolveGuard(guard: Token<Guard>, scopeModule: Class, controllerClass: Class, method?: string): Guard {
-        const cacheKey = `${guard.name}_${scopeModule.name}_${controllerClass.name}_${method || ''}`;
-        
-        if (this.guardsCache.has(cacheKey)) {
-            return this.guardsCache.get(cacheKey)!;
+    private initalizeControllers() {
+        const initializedControllers = new Map<Class, InitializedControllerInfo>();
+
+        for(const [controller, controllerInfo] of this.container.Controllers) {
+            const dependencies = controllerInfo.Dependencies.map(dep => this.container.resolve(dep, controllerInfo.Context, { reflectorContext: { controller } }))
+            const instance = new controller(...dependencies)
+            initializedControllers.set(controller, { context: controllerInfo.Context, instance, prefix: controllerInfo.Prefix });
         }
-        
-        const resolvedGuard = this.container.resolve(guard, scopeModule, {
-            target: controllerClass,
-            property: method
-        });
-        
-        this.guardsCache.set(cacheKey, resolvedGuard);
-        return resolvedGuard;
+
+        return initializedControllers
+    }
+    private resolveGuard(guard: Token, scope: Class, reflectorContext: ReflectorContext) {
+        const cacheKey = `${guard.name}_${scope.name}_${reflectorContext.controller.name}_${reflectorContext.handler}`
+        if (this.guardsCache.has(cacheKey)) return this.guardsCache.get(cacheKey);
+        const resolvedGuard = this.container.resolve(guard, scope, { reflectorContext })
+        this.guardsCache.set(cacheKey, resolvedGuard)
+        return resolvedGuard
     }
 
-    private extractGuards(controllerInstance: any, method: string, controllerInfo: ControllerRegister, controllerClass: Class) {
-        const [after_guards, before_guards] = ReflectionHandler.getGuardsMetadata(controllerInstance, method)
-            .reverse()
-            .reduce((prev, curr) => {
-                if (curr.type === "after") prev[0].push(curr.token)
-                else prev[1].push(curr.token)
-                return prev
-            }, [[], []] as [Token<Guard>[], Token<Guard>[]])
+    private extractGuards(initializedControllerInfo: InitializedControllerInfo, method: string) {
+        const controllerGuards = MetadataHandler.GetGuardMetadata(initializedControllerInfo.instance.constructor) || []
+        const handlerGuards = MetadataHandler.GetGuardMetadata(initializedControllerInfo.instance.constructor, method) || []
 
-        const controller_guard_resolver = (guard: Token<Guard>) => {
-            return this.resolveGuard(guard, controllerInfo.ScopeModule, controllerClass);
-        }
-        
-        const handler_guard_resolver = (guard: Token<Guard>) => {
-            return this.resolveGuard(guard, controllerInfo.ScopeModule, controllerClass, method);
+        const separeGuardCallback = (previous: any[][], current: GuardMetadata) => {
+            if (current.type === 'before') previous[0].push(current.provider)
+            else previous[1].push(current.provider)
+            return previous
         }
 
-        const stack_after_guards = [...Array.from(controllerInfo.BeforeGuards).map(controller_guard_resolver), 
-                                   ...after_guards.map(handler_guard_resolver)]
-        
-        const stack_before_guards = [...Array.from(controllerInfo.BeforeGuards).map(controller_guard_resolver), 
-                                    ...before_guards.map(handler_guard_resolver)]
+        const controllerGuardsSeparated = controllerGuards.reduce(separeGuardCallback, [[],[]])
 
-        return { stack_after_guards, stack_before_guards }
+        const handlerGuardSeparated = handlerGuards.reduce(separeGuardCallback, [[], []])
+
+        const guardResolveControllerContext = (guard: Token) => this.resolveGuard(guard, initializedControllerInfo.context, { controller: initializedControllerInfo.instance.constructor })
+        const guardResolveHandlerContext = (guard: Token) => this.resolveGuard(guard, initializedControllerInfo.context, { controller: initializedControllerInfo.instance, handler: method })
+
+        const beforeGuards = [
+            ...controllerGuardsSeparated[0].map(guardResolveControllerContext).reverse(),
+            ...handlerGuardSeparated[0].map(guardResolveHandlerContext).reverse()
+        ]
+
+        const afterGuards = [
+            ...controllerGuardsSeparated[1].map(guardResolveControllerContext).reverse(),
+            ...handlerGuardSeparated[1].map(guardResolveHandlerContext).reverse()
+        ]
+
+        return { beforeGuards, afterGuards }
     }
 
-    /**
-     * Crea un manejador IPC para un método de controlador
-     */
-    private createIpcHandler(controllerInstance: any, method: string, full_channel: string, 
-                           controllerClass: Class, stack_before_guards: Guard[], stack_after_guards: Guard[]) {
-        
-        return async (event: IpcMainInvokeEvent | IpcMainEvent, payload: any) => {
-            this.options.logger && this.Logger.info(`[REQUESTED: ${full_channel}] -> (${controllerClass.name}.${method})`)
-            
-            const context: ExecutionContext = {
-                ipcEvent: event,
-                payload: payload
-            }
-
-            // Ejecutar guardias previos
-            try {
-                const beforeResult = await this.executeBeforeGuards(stack_before_guards, context)
-                if (beforeResult === false) return { success: false }
-            } catch (error) {
-                return this.handleError(error, full_channel)
-            }
-
-            // Ejecutar el método del controlador
-            let result;
-            try {
-                const params = ReflectionHandler.getParamsMetadata(controllerInstance, method)
-                result = await controllerInstance[method](...ParamResolver.resolve(context, params))
-            } catch (error) {
-                return this.handleError(error, full_channel)
-            }
-
-            // Ejecutar guardias posteriores
-            this.executeAfterGuards(stack_after_guards, context, full_channel)
-
-            return result
-        }
+    private resolveParams(params: ParamMetadata[], executionContext: ExecutionContext) {
+        return params.map(param => {
+            if (param === 'event') return executionContext.event
+            if (param === 'payload') return executionContext.payload
+            if (param === 'request') return executionContext
+            return undefined
+        })
     }
 
-    /**
-     * Ejecuta los guardias previos a un método
-     */
-    private async executeBeforeGuards(guards: Guard[], context: ExecutionContext) {
+    private async executeBeforeGuards(guards: any[], context: ExecutionContext) {
         for(const guard of guards) {
-            const params = ReflectionHandler.getParamsMetadata(guard as any, 'execute')
-            const result = await guard.execute(...ParamResolver.resolve(context, params))
+            const params: ParamMetadata[] = MetadataHandler.GetParamsMetadata(guard.constructor, 'execute') || []
+            const result = await guard.execute(...this.resolveParams(params, context))
             if (result === false) return false
         }
         return true
     }
 
-    /**
-     * Ejecuta los guardias posteriores a un método
-     */
-    private executeAfterGuards(guards: Guard[], context: ExecutionContext, channel: string) {
+    private async executeAfterGuards(guards: any[], context: ExecutionContext, channel: string) {
         Promise.all(guards.map(guard => {
-            const params = ReflectionHandler.getParamsMetadata(guard as any, 'execute')
-            return guard.execute(...ParamResolver.resolve(context, params))
+            const params = MetadataHandler.GetParamsMetadata(guard, 'execute') || []
+            return guard.execute(...this.resolveParams(params, context))
         })).catch(error => {
-            return this.handleError(error, channel)
+            this.handleError(error, channel)
         })
     }
 
-    /**
-     * Maneja errores de ejecución
-     */
-    private handleError(error: any, channel: string) {
+    private handleError(error: unknown, channel: string) {
         const message = error instanceof Error ? error.message : "Internal Error"
-        this.Logger.error(`[${message}] [channel: ${channel}]`)
+        this.logger.error(`[channel: ${channel}] ${message}`)
         return { success: false, message, details: error }
     }
 
-    /**
-     * Registra los manejadores para todos los controladores
-     */
-    // Inicializar controladores de forma más eficiente
-    private initializeControllers() {
-        const controllers = Array.from(this.container.Controllers);
-        const initializedControllers = new Map<Class, any>();
-        
-        // Inicializar todos los controladores primero
-        for (const [controllerClass, controllerInfo] of controllers) {
-            const dependencies = controllerInfo.Dependencies.map(dep => 
-                this.container.resolve(dep, controllerInfo.ScopeModule, { target: controllerClass })
-            );
+    private createHandler(props: CreateHandlerProps) {
+        return async (event: IpcMainInvokeEvent | IpcMainEvent, payload: any) => {
+            this.applicationOptions.logger && this.logger.info(`[${props.fullChannel}] => ${props.controllerInstance.constructor.name}().${props.method}`)
+
+            const executionContext: ExecutionContext = { event, payload }
+
+            try {
+                const result = await this.executeBeforeGuards(props.beforeGuards, executionContext)
+                if (result === false) return { success: false }
+            } catch (error) {
+                return this.handleError(error, props.fullChannel)
+            }
+
+            let result;
             
-            initializedControllers.set(controllerClass, new controllerClass(...dependencies));
+            try {
+                const params = MetadataHandler.GetParamsMetadata(props.controllerInstance, props.method) || []
+                result = props.controllerInstance[props.method](...this.resolveParams(params, executionContext))
+            } catch (error) {
+                return this.handleError(error, props.fullChannel)
+            }
+
+            this.executeAfterGuards(props.afterGuards, executionContext, props.fullChannel)
+
+            return result;
+
         }
-        
-        return initializedControllers;
     }
-    
-    private RegisterHandlers() {
-        const controllers = Array.from(this.container.Controllers);
-        const initializedControllers = this.initializeControllers();
-        
-        for (const [controllerClass, controllerInfo] of controllers) {
-            const controllerInstance = initializedControllers.get(controllerClass);
-            // Obtener métodos del controlador
-            const methods = Object.getOwnPropertyNames(controllerClass.prototype).filter(name => name !== 'constructor')
 
-            // Resolver dependencias del controlador
-            const dependencies_resolver = this.createDependencyResolver(controllerClass, controllerInfo.ScopeModule)
-            const controller_dependencies = controllerInfo.Dependencies.map(dependencies_resolver)
-            
-            // Instanciar el controlador
-            const controller_instance = new controllerClass(...controller_dependencies)
+    private registerHandlers() {
+        const initializedControllers = this.initalizeControllers()
 
-            // Procesar cada método del controlador
-            for(const method of methods) {
-                const handler_metadata = ReflectionHandler.getHandlerMetadata(controller_instance, method)
-                if (!handler_metadata) continue;
+        for (const [controllerClass, initializedControllerInfo] of initializedControllers) {
+            const controllerMethods = Object.getOwnPropertyNames(controllerClass.prototype).filter(name => name !== 'constructor')
 
-                // Extraer y organizar guardias
-                const { stack_after_guards, stack_before_guards } = 
-                    this.extractGuards(controller_instance, method, controllerInfo, controllerClass)
+            for (const controllerMethod of controllerMethods) {
+                const handlerMetadata = MetadataHandler.GetHandlerMetadata(initializedControllerInfo.instance, controllerMethod)
 
-                // Construir el canal completo
-                const full_channel = [controllerInfo.Prefix, handler_metadata.channel].filter(Boolean).join(':')
-            
-                // Verificar duplicados
-                if(ipcMain.listeners(full_channel).length > 0 && this.options.overloadHandlers === false) {
-                    throw new Error(`Duplicate handler for channel: "${full_channel}"`)
-                }
+                if (!handlerMetadata) continue
 
-                // Crear y registrar el manejador IPC
-                const ipc_handler = this.createIpcHandler(
-                    controller_instance, method, full_channel, 
-                    controllerClass, stack_before_guards, stack_after_guards
-                )
-                
-                if (handler_metadata.type === "invoke") {
-                    ipcMain.handle(full_channel, ipc_handler)
-                } else {
-                    ipcMain.on(full_channel, ipc_handler)
-                }
+                const { beforeGuards, afterGuards } = this.extractGuards(initializedControllerInfo, controllerMethod)
 
-                this.Logger.info(`[${handler_metadata.type.toUpperCase()}] [channel: ${full_channel}]`)
+                const fullChannel = [initializedControllerInfo.prefix, handlerMetadata.channel].filter(Boolean).join(':')
+
+                if(ipcMain.listeners(fullChannel).length > 0 && this.applicationOptions.overloadHandlers === false)
+                    throw new Error(`Duplicate handler for channel: "${fullChannel}"`)
+
+                const handler = this.createHandler({
+                    afterGuards,
+                    beforeGuards,
+                    controllerInstance: initializedControllerInfo.instance,
+                    fullChannel,
+                    method: controllerMethod
+                })
+
+                if (handlerMetadata.type === 'invoke') ipcMain.handle(fullChannel, handler)
+                else ipcMain.on(fullChannel, handler)
+
+                this.logger.info(`[${handlerMetadata.type.toUpperCase()}] [channel: ${fullChannel}]`)
             }
         }
-    }
-
-    get Container() {
-        return this.container;
     }
 }
 
 export class ElectronDI {
-    static createApp(MainModule: Class, options?: AppOptions) {
-        const app = new App(new DependencyContainer(MainModule), options)
-        return app;
+    static createApp(moduleInit: Class) {
+        const app = new Application(new Container(moduleInit))
+        return app
     }
 }
-

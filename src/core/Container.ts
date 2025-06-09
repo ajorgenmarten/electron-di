@@ -1,161 +1,139 @@
-import { Class, InjectableMetadata, Provider, Token, GuardMetadata, Guard, InstanceOf } from "../types"
-import ReflectionHandler from "./ReflectionHandler";
+import { InjectableMetadata, Token, Class, Provider } from "./types";
+import { MetadataHandler } from "./MetadataHandler";
 import { Reflector } from "./Reflector";
+import { Logger } from "./Logger";
 
-type ProviderRegister = {
-    ScopeModule: Class
-    Value: Class
-    Options: InjectableMetadata
+type Injectable = {
+    value: Class
+    Context: Class
+    Dependencies: Token[]
 }
 
-type ModuleRegister = {
-    Providers: Set<Token>
+type ModuleInfo = {
     Imports: Set<Class>
+    Providers: Set<Token>
     Exports: Set<Token>
 }
 
-export type ControllerRegister = {
+type ProviderInfo = {
+    Scope: InjectableMetadata['scope']
+} & Injectable
+
+type ControllerInfo = {
     Prefix: string
-    AfterGuards: Set<Token<Guard>>
-    BeforeGuards: Set<Token<Guard>>
-    Dependencies: Token[]
-    ScopeModule: Class
+} & Injectable
+
+type ResolveInfo = {
+    reflectorContext?: { controller: Class, handler?: string }
 }
 
-export class DependencyContainer {
-    private globals: Map<Class, ModuleRegister> = new Map();
-    private modules: Map<Class, ModuleRegister> = new Map();
-    private providers: Map<Token, ProviderRegister> = new Map();
-    private instances: WeakMap<Token, Class> = new WeakMap();
-    private controllers: Map<Class, ControllerRegister> = new Map();
+export class Container {
+    private logger: Logger =  Logger.Logger
+    private modules: Map<Class, ModuleInfo> = new Map()
+    private globals: Map<Class, ModuleInfo> = new Map()
+    private providers: Map<Token, ProviderInfo> = new Map()
+    private controllers: Map<Class, ControllerInfo> = new Map()
+    private resolutinCache: Set<string> = new Set() 
+    private instances: WeakMap<Token, any> = new WeakMap()
 
-    constructor(module: Class) {
-        this.register(module)
+    constructor(importedModule: Class) {
+        this.register(importedModule)
     }
 
-    private register(module: Class) {
-        if (this.modules.has(module) || this.globals.has(module)) return
+    private register(importedModule: Class) {
+        if (this.modules.has(importedModule) || this.globals.has(importedModule)) return
 
-        const module_metadata = ReflectionHandler.getModuleMetadata(module)
-        if (!module_metadata) throw new Error(`Class "${module.name}" is not a module`)
+        const moduleMetadata = MetadataHandler.GetModuleMetadata(importedModule)
+        if (!moduleMetadata) throw new Error(`Class "${importedModule.name}" is not a module`)
 
-        const module_global: boolean = ReflectionHandler.getGlobalMetadata(module)
-        const module_registered_data = { 
-            Exports: new Set( module_metadata.exports || [] ),
-            Imports: new Set( module_metadata.imports || [] ),
-            Providers: new Set( module_metadata.providers?.map(p => typeof p === 'object' ? p.provided : p) || [] )
-        }
-        if (module_global) this.globals.set(module, module_registered_data)
-        else this.modules.set( module, module_registered_data)
+        const controllers = moduleMetadata.controllers || []
+        const providers = moduleMetadata.providers || []
+        const exports = moduleMetadata.exports || []
+        const imports = moduleMetadata.imports || []
 
-        module_metadata.imports?.forEach(sub_module => { this.register(sub_module) })
+        const normalizedProviders = providers.map((provider) => this.normalizeProvider(provider) )
+        const moduleInfo: ModuleInfo = { Exports: new Set(exports), Imports: new Set(imports), Providers: new Set(normalizedProviders.map(np => np.token)) }
         
-        module_metadata.providers?.forEach(provider => { this.register_provider(provider, module) })
+        const globalMetadata = MetadataHandler.GetGlobalMetadata(importedModule)
+        if (globalMetadata) this.globals.set(importedModule, moduleInfo)
+        else this.modules.set(importedModule, moduleInfo)
 
-        module_metadata.controllers?.forEach(controller => { this.register_controller(controller, module) })
+        for(const cls of imports) this.register(cls)
 
+        for(const provider of normalizedProviders) this.registerProvider(provider.cls, provider.token, importedModule)
+
+        for(const controller of controllers) this.registerController(controller, importedModule)
     }
 
-    private register_provider(provider: Provider, scope_module: Class) {
-        const [token, cls] = typeof provider === 'object' ? [provider.provided, provider.useClass] : [provider, provider]
-        
+    private normalizeProvider(provider: Provider) {
+        const [cls, token] = typeof provider === 'object' ? [provider.useClass, provider.provided] : [provider, provider]
+        return { cls, token }
+    }
+
+    private registerProvider(cls: Class, token: Token, context: Class) {
         if (this.providers.has(token)) return
 
-        const options = ReflectionHandler.getInjectableMetadata(cls)
-        if (!options) throw new Error(`Class "${cls.name}" is not injectable`)
+        const providerMetadata = MetadataHandler.GetInjectableMetadata(cls)
+        if (!providerMetadata) throw new Error(`Class "${cls.name}" is not a provider`)
+        
+        const dependencies = MetadataHandler.GetParamTypes(cls) || []
 
-        this.providers.set(token, { Options: options, Value: cls, ScopeModule: scope_module })
+        this.providers.set(token, { Context: context, Dependencies: dependencies, Scope: providerMetadata.scope, value: cls })
     }
 
-    private register_controller(controller: Class, scope_module: Class) {
+    private registerController(controller: Class, context: Class) {
         if (this.controllers.has(controller)) return
 
-        const metadata = ReflectionHandler.getControllerMetadata(controller)
-        if (!metadata) throw new Error(`Class "${controller.name}" is not a controller`)
+        const controllerMetadata = MetadataHandler.GetControllerMetadata(controller)
+        if (!controllerMetadata) throw new Error(`Class "${controller.name}" is not a controller`)
 
-        const [afters, befores] = ReflectionHandler.getGuardsMetadata(controller).reverse().reduce((p, c) => {
-            if (c.type === 'after') p[0].push(c)
-            else p[1].push(c)
-            return p
-        }, [[], []] as [GuardMetadata[], GuardMetadata[]])
+        const dependencies = MetadataHandler.GetParamTypes(controller) || []
 
-        const controller_info: ControllerRegister = {
-            Prefix: metadata.prefix || "",
-            AfterGuards: new Set(afters.map(m => m.token)),
-            BeforeGuards: new Set(befores.map(m => m.token)),
-            Dependencies: ReflectionHandler.getParamTypes(controller),
-            ScopeModule: scope_module
-        }
-
-        this.controllers.set(controller, controller_info)
+        this.controllers.set(controller, { Context: context, Dependencies: dependencies, value: controller, Prefix: controllerMetadata.prefix })
     }
 
-    // Agregar un caché de resolución para evitar recálculos
-    private resolutionCache: Map<string, boolean> = new Map();
+    private checkInModuleScope(token: Token, scope: Class): boolean {
+        // Verificar en el módulo actual
+        const moduleInfo = this.modules.get(scope);
+        if (!moduleInfo) return false;
     
-    private getCacheKey(token: Token, root: Class, scope: Class): string {
-        return `${token.name}_${root.name}_${scope.name}`;
-    }
+        // Verificar si el token es proveído directamente
+        if (moduleInfo.Providers.has(token)) return true;
     
-    private check_scope_access(token: Token, root: Class, scope: Class) {
-        const cacheKey = this.getCacheKey(token, root, scope);
-        if (this.resolutionCache.has(cacheKey)) {
-            return this.resolutionCache.get(cacheKey);
-        }
-        
-        if (root === scope && this.modules.get(root)?.Providers.has(token)) {
-            this.resolutionCache.set(cacheKey, true);
-            return true;
-        }
-        
-        const modules = this.modules.get(root)?.Imports
+        // Verificar en módulos importados (recursivamente)
+        for (const importedModule of moduleInfo.Imports) {
+            const importedModuleInfo = this.modules.get(importedModule) || this.globals.get(importedModule);
+            if (!importedModuleInfo) continue;
     
-        if (!modules) return false
-    
-        for( const module of modules) {
-            if (this.globals.has(module)) continue;
-    
-            const module_registered = this.modules.get(module) as ModuleRegister
-    
-            const [in_providers, in_exports] = [
-                module_registered.Providers.has(token),
-                module_registered.Exports.has(token)
-            ]
-            
-            if (in_providers && in_exports) return true
-    
-            if (in_exports && this.check_scope_access(token, root, module)) return true 
+            // Si el módulo importado exporta el token, verificar si lo provee
+            if (importedModuleInfo.Exports.has(token)) {
+                // Verificar si el módulo importado lo provee directamente
+                if (importedModuleInfo.Providers.has(token)) return true;
+                
+                // O si alguno de sus módulos importados lo provee
+                if (this.checkInModuleScope(token, importedModule)) return true;
+            }
         }
     
-        // Almacenar el resultado en caché antes de retornar
-        this.resolutionCache.set(cacheKey, false);
         return false;
     }
-    
-    private check_global_access(token: Token) {
-        const global_modules = Array.from(this.globals)
 
-        for (const [module, module_info] of global_modules) {
-            const [in_providers, in_exports] = [
-                module_info.Providers.has(token),
-                module_info.Exports.has(token)
-            ]
+    private checkInGlobalScope(token: Token, scope: Class) {
+        for(const [cls, info] of this.globals) {
+            if (cls === scope && info.Providers.has(token)) return true
 
-            if (in_providers && in_exports) return true
+            if (!info.Exports.has(token)) continue
+            
+            const importedModules = Array.from(info.Imports)
 
-            if (in_exports) {
-                
-                const modules = Array.from(module_info.Imports)
+            for (const importedModule of importedModules) {
+                if (this.globals.has(importedModule)) continue
 
-                for (const import_module of modules) {
-                    if (this.globals.has(import_module)) continue;
+                const importedModuleInfo = this.modules.get(importedModule) as ModuleInfo
 
-                    const module_registered = this.modules.get(import_module) as ModuleRegister
+                if (!importedModuleInfo.Exports.has(token)) continue
 
-                    if (module_registered.Exports.has(token) && this.check_scope_access(token, module, import_module)) return true
-
-                }
-
+                if (this.checkInModuleScope(token, importedModule)) return true
             }
 
         }
@@ -163,34 +141,35 @@ export class DependencyContainer {
         return false
     }
 
-    /**
-    // CONDICIONES PARA RESOLVER UN PROVEEDOR
-    // 1. Debe estar definido en los proveedores de esta clase
-    // 2. Debe estar registrado y exportado en un modulo global
-    // 3. Debe estar registrado y exportdao en un modulo importado
-    */
-    resolve<T>(token: Token<T>, scope: Class, context?: { target: Class, property?: string }): InstanceOf<any> {
-        if (token === Reflector && context) return new Reflector(context.target, context?.property)
+    resolve(token: any, scope: Class, options: ResolveInfo): any {
+        if (typeof token !== 'function') return undefined
+
+        if (token === Reflector && options.reflectorContext) return new Reflector(options.reflectorContext.controller, options.reflectorContext.handler)
+
         const provider = this.providers.get(token)
-        if (!provider) throw new Error(`Class "${token.name}" has been not provided`)
 
-        if (!this.check_global_access(token) && !this.check_scope_access(token, scope, scope))
-            throw new Error(`Class "${token.name}" can not injected in this scope`)
+        if (!provider) throw new Error(`Provider "${token.name}" has been not provided`)
 
-        if (provider.Options.scope === "singleton" && this.instances.has(token)) {
-            return this.instances.get(token) as Class<T>
+        const cacheKey = `${token.name}_${scope.name}`
+
+        if (!this.resolutinCache.has(cacheKey) && this.checkInGlobalScope(token, scope) && this.checkInModuleScope(token, scope)) {
+            this.logger.warn(`Provider "${token.name}" cannot be resolved in module "${scope.name}"`)
+            return undefined
         }
 
-        const injections = ReflectionHandler.getParamTypes(provider.Value)
-        const dependencies = injections.map(depToken => this.resolve(depToken, provider.ScopeModule, context ))
+        const instance = this.instances.get(token)
 
-        const instance = new provider.Value(...dependencies)
+        if (instance && provider.Scope === 'singleton') return instance
 
-        if (provider.Options.scope === "singleton") {
-            this.instances.set(token, instance)
-        }
+        const params = MetadataHandler.GetParamTypes(provider.value) || []
 
-        return instance
+        const dependencies = params.map((param: Token) => this.resolve(param, scope, options))
+
+        const newInstance = new provider.value(...dependencies)
+
+        if (provider.Scope === 'singleton') this.instances.set(token, newInstance)
+
+        return newInstance
     }
 
     get Instances() {

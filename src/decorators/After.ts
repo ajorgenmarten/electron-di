@@ -1,14 +1,13 @@
-import ReflectionHandler from "../core/ReflectionHandler";
-import { Class, GuardMetadata, Token } from "../types";
+import { MetadataHandler, GuardMetadata, Token, Class } from "../core";
 
-export function After(...middlewares: Token[]): ClassDecorator | MethodDecorator {
+export function After(...guards: Token[]): ClassDecorator | MethodDecorator {
     return function (target, propertyKey) {
-        for(const mdl of middlewares) {
+        for(const mdl of guards) {
             const metadata: GuardMetadata = {
-                token: mdl,
+                provider: mdl,
                 type: 'after'
             }
-            ReflectionHandler.setGuardMetadata(metadata, target as Class, propertyKey as string)
+            MetadataHandler.SetGuardMetadata(target as Class, metadata, propertyKey as string)
         }
     }
 }

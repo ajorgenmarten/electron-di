@@ -1,8 +1,8 @@
-import ReflectionHandler from "../core/ReflectionHandler";
-import { Class, ModuleMetadata } from "../types";
+import { Class, MetadataHandler, ModuleMetadata } from "../core"
+
 
 export function Module(options: ModuleMetadata): ClassDecorator {
     return function (target: Object) {
-        ReflectionHandler.setModuleMetadata(options, target as Class)
+        MetadataHandler.SetModuleMetadata(target as Class, options)
     }
 }

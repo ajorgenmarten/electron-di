@@ -44,7 +44,7 @@ export class Container {
         if (this.modules.has(importedModule) || this.globals.has(importedModule)) return
 
         const moduleMetadata = MetadataHandler.GetModuleMetadata(importedModule)
-        if (!moduleMetadata) throw new Error(`Class "${importedModule.name}" is not a importedModule`)
+        if (!moduleMetadata) throw new Error(`Class "${importedModule.name}" is not a module`)
 
         const controllers = moduleMetadata.controllers || []
         const providers = moduleMetadata.providers || []
@@ -76,7 +76,7 @@ export class Container {
         const providerMetadata = MetadataHandler.GetInjectableMetadata(cls)
         if (!providerMetadata) throw new Error(`Class "${cls.name}" is not a provider`)
         
-        const dependencies = MetadataHandler.GetParamTypes(cls)
+        const dependencies = MetadataHandler.GetParamTypes(cls) || []
 
         this.providers.set(token, { Context: context, Dependencies: dependencies, Scope: providerMetadata.scope, value: cls })
     }
@@ -87,35 +87,39 @@ export class Container {
         const controllerMetadata = MetadataHandler.GetControllerMetadata(controller)
         if (!controllerMetadata) throw new Error(`Class "${controller.name}" is not a controller`)
 
-        const dependencies = MetadataHandler.GetParamTypes(controller)
+        const dependencies = MetadataHandler.GetParamTypes(controller) || []
 
         this.controllers.set(controller, { Context: context, Dependencies: dependencies, value: controller, Prefix: controllerMetadata.prefix })
     }
 
-    private checkInModuleScope(token: Token, scope: Class) {
-        const moduleInfo = this.modules.get(scope) as ModuleInfo
-
-        if (moduleInfo.Providers.has(token)) return true
-
-        const importedModules = Array.from(moduleInfo.Imports)
-
-        for (const importedModule of importedModules) {
-            if (this.globals.has(importedModule)) continue
-
-            const importedModuleInfo = this.modules.get(importedModule) as ModuleInfo
-
-            if (!importedModuleInfo.Exports.has(token)) continue
-
-            if (this.checkInModuleScope(token, importedModule)) return true
+    private checkInModuleScope(token: Token, scope: Class): boolean {
+        // Verificar en el módulo actual
+        const moduleInfo = this.modules.get(scope);
+        if (!moduleInfo) return false;
+    
+        // Verificar si el token es proveído directamente
+        if (moduleInfo.Providers.has(token)) return true;
+    
+        // Verificar en módulos importados (recursivamente)
+        for (const importedModule of moduleInfo.Imports) {
+            const importedModuleInfo = this.modules.get(importedModule) || this.globals.get(importedModule);
+            if (!importedModuleInfo) continue;
+    
+            // Si el módulo importado exporta el token, verificar si lo provee
+            if (importedModuleInfo.Exports.has(token)) {
+                // Verificar si el módulo importado lo provee directamente
+                if (importedModuleInfo.Providers.has(token)) return true;
+                
+                // O si alguno de sus módulos importados lo provee
+                if (this.checkInModuleScope(token, importedModule)) return true;
+            }
         }
-
-        return false
+    
+        return false;
     }
 
     private checkInGlobalScope(token: Token, scope: Class) {
-        const globalModules = Array.from(this.globals)
-
-        for(const [cls, info] of globalModules) {
+        for(const [cls, info] of this.globals) {
             if (cls === scope && info.Providers.has(token)) return true
 
             if (!info.Exports.has(token)) continue
@@ -148,20 +152,16 @@ export class Container {
 
         const cacheKey = `${token.name}_${scope.name}`
 
-        if (!this.resolutinCache.has(cacheKey)) {
-            if (this.checkInGlobalScope(token, scope) || this.checkInModuleScope(token, scope))
-                this.resolutinCache.add(cacheKey)
-            else {
-                this.logger.warn(`Provider "${token.name}" cannot be resolved in module "${scope.name}"`)
-                return undefined
-            }
+        if (!this.resolutinCache.has(cacheKey) && this.checkInGlobalScope(token, scope) && this.checkInModuleScope(token, scope)) {
+            this.logger.warn(`Provider "${token.name}" cannot be resolved in module "${scope.name}"`)
+            return undefined
         }
 
         const instance = this.instances.get(token)
 
         if (instance && provider.Scope === 'singleton') return instance
 
-        const params = MetadataHandler.GetParamTypes(provider.value)
+        const params = MetadataHandler.GetParamTypes(provider.value) || []
 
         const dependencies = params.map((param: Token) => this.resolve(param, scope, options))
 

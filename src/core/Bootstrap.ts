@@ -44,11 +44,9 @@ class Application {
     }
     
     private initalizeControllers() {
-        const controllers = Array.from(this.container.Controllers)
-
         const initializedControllers = new Map<Class, InitializedControllerInfo>();
 
-        for(const [controller, controllerInfo] of controllers) {
+        for(const [controller, controllerInfo] of this.container.Controllers) {
             const dependencies = controllerInfo.Dependencies.map(dep => this.container.resolve(dep, controllerInfo.Context, { reflectorContext: { controller } }))
             const instance = new controller(...dependencies)
             initializedControllers.set(controller, { context: controllerInfo.Context, instance, prefix: controllerInfo.Prefix });
@@ -191,7 +189,7 @@ class Application {
     }
 }
 
-class ElectronDI {
+export class ElectronDI {
     static createApp(moduleInit: Class) {
         const app = new Application(new Container(moduleInit))
         return app

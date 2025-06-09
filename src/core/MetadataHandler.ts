@@ -28,7 +28,7 @@ export class MetadataHandler {
         else
             return Reflect.getMetadata(key, target.cls, target.method)
     }
-    static GetParamTypes(cls: Class, method?: string): any[] {
+    static GetParamTypes(cls: Class, method?: string): any[] | undefined {
         return this.get('design:paramtypes', { cls, method })
     }
 

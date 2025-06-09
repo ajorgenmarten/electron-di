@@ -403,7 +403,7 @@ import { Injectable, Guard, Reflector } from 'electron-di'
 export default class RolesGuard implements Guard {
   constructor(private readonly reflector: Reflector) {}
   async execute(@Payload() payload) {
-    const roles = reflector.getMetadata('roles')
+    const roles = reflector.get('roles')
     // execute logic...
     return true
   }

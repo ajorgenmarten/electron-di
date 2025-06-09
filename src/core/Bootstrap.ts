@@ -149,6 +149,8 @@ class Application {
 
             this.executeAfterGuards(props.afterGuards, executionContext, props.fullChannel)
 
+            this.applicationOptions.logger && this.logger.debug(`[Result ${props.fullChannel}]`, result)
+
             return result;
 
         }
@@ -190,8 +192,8 @@ class Application {
 }
 
 export class ElectronDI {
-    static createApp(moduleInit: Class) {
-        const app = new Application(new Container(moduleInit))
+    static createApp(moduleInit: Class, options?: ApplicationOptions) {
+        const app = new Application(new Container(moduleInit), options)
         return app
     }
 }

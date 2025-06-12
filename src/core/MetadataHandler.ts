@@ -73,8 +73,8 @@ export class MetadataHandler {
         return this.get(SYMBOLS.guard, { cls, method })
     }
     static SetGuardMetadata(cls: Class, metadata: GuardMetadata, method?: string) {
-        const guardMetadata = this.GetGuardMetadata(cls, method) || []
-        guardMetadata.push(metadata)
+        let guardMetadata = this.GetGuardMetadata(cls, method) || []
+        guardMetadata = [metadata, ...guardMetadata]
         this.define(SYMBOLS.guard, guardMetadata, { cls, method })
     }
     // HANDLE PARAMS METADATA

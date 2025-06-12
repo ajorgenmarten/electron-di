@@ -80,13 +80,13 @@ class Application {
         const guardResolveHandlerContext = (guard: Token) => this.resolveGuard(guard, initializedControllerInfo.context, { controller: initializedControllerInfo.instance, handler: method })
 
         const beforeGuards = [
-            ...controllerGuardsSeparated[0].map(guardResolveControllerContext).reverse(),
-            ...handlerGuardSeparated[0].map(guardResolveHandlerContext).reverse()
+            ...controllerGuardsSeparated[0].map(guardResolveControllerContext),
+            ...handlerGuardSeparated[0].map(guardResolveHandlerContext)
         ]
 
         const afterGuards = [
-            ...controllerGuardsSeparated[1].map(guardResolveControllerContext).reverse(),
-            ...handlerGuardSeparated[1].map(guardResolveHandlerContext).reverse()
+            ...controllerGuardsSeparated[1].map(guardResolveControllerContext),
+            ...handlerGuardSeparated[1].map(guardResolveHandlerContext)
         ]
 
         return { beforeGuards, afterGuards }
@@ -128,6 +128,11 @@ class Application {
     private createHandler(props: CreateHandlerProps) {
         return async (event: IpcMainInvokeEvent | IpcMainEvent, payload: any) => {
             this.applicationOptions.logger && this.logger.info(`[${props.fullChannel}] => ${props.controllerInstance.constructor.name}().${props.method}`)
+
+            if(typeof payload !== 'object') {
+                this.applicationOptions.logger && this.logger.warn(`The payload isn't an object and will resolve to undefined`)
+                payload = undefined
+            }
 
             const executionContext: ExecutionContext = { event, payload }
 

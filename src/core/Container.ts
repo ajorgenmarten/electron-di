@@ -122,11 +122,9 @@ export class Container {
         for(const [cls, info] of this.globals) {
             if (cls === scope && info.Providers.has(token)) return true
 
-            if (!info.Exports.has(token)) continue
-            
-            const importedModules = Array.from(info.Imports)
+            if (info.Exports.has(token) && info.Providers.has(token)) return true
 
-            for (const importedModule of importedModules) {
+            for (const importedModule of info.Imports) {
                 if (this.globals.has(importedModule)) continue
 
                 const importedModuleInfo = this.modules.get(importedModule) as ModuleInfo
@@ -152,7 +150,7 @@ export class Container {
 
         const cacheKey = `${token.name}_${scope.name}`
 
-        if (!this.resolutinCache.has(cacheKey) && this.checkInGlobalScope(token, scope) && this.checkInModuleScope(token, scope)) {
+        if (!this.resolutinCache.has(cacheKey) && !this.checkInGlobalScope(token, scope) && !this.checkInModuleScope(token, scope)) {
             this.logger.warn(`Provider "${token.name}" cannot be resolved in module "${scope.name}"`)
             return undefined
         }

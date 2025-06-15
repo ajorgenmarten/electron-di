@@ -4,7 +4,7 @@ export function Before(guard: Token): ClassDecorator | MethodDecorator {
     return function (target, propertyKey) {
         const metadata: GuardMetadata = {
             provider: guard,
-            type: 'after'
+            type: 'before'
         }
         MetadataHandler.SetGuardMetadata(target as Class, metadata, propertyKey as string)
     }

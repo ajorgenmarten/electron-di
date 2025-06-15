@@ -7,7 +7,8 @@ const SYMBOLS = {
     injectable: Symbol('electron:injectable'),
     guard: Symbol('electron:guard'),
     handler: Symbol('electron:handler'),
-    params: Symbol('electron:params')
+    params: Symbol('electron:params'),
+    setMetadata: Symbol('electron:setmetadata')
 }
 
 type DecorationTarget = {
@@ -85,5 +86,14 @@ export class MetadataHandler {
         const paramsMetadata = this.GetParamsMetadata(cls, method) || []
         paramsMetadata[index] = metadata
         this.define(SYMBOLS.params, paramsMetadata, { cls, method })
+    }
+    // HANDLE SET METADATA HELPER
+    static GetSetMetadata(cls: Class, key: string, method?: string) {
+        return (this.get(SYMBOLS.setMetadata, { cls, method }) ?? {})[key]
+    }
+    static SetSetMetadata(cls: Class, key: string, metadata: any, method?: string) {
+        const settedMetadata = this.get(SYMBOLS.setMetadata, { cls, method }) ?? {}
+        settedMetadata[key] = metadata
+        this.define(SYMBOLS.setMetadata, settedMetadata, { cls, method })
     }
 }

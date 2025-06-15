@@ -129,7 +129,7 @@ class Application {
         return async (event: IpcMainInvokeEvent | IpcMainEvent, payload: any) => {
             this.applicationOptions.logger && this.logger.info(`[${props.fullChannel}] => ${props.controllerInstance.constructor.name}().${props.method}`)
 
-            if(typeof payload !== 'object') {
+            if(typeof payload !== 'object' && typeof payload !== 'undefined') {
                 this.applicationOptions.logger && this.logger.warn(`The payload isn't an object and will resolve to undefined`)
                 payload = undefined
             }

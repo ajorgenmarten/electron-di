@@ -4,16 +4,16 @@ import { Class } from "./types";
 export class Reflector {
     constructor(private cls: Class, private handler?: string) {}
 
-    get(key: string) {
+    get<T>(key: string): T | undefined {
         if (this.handler) return MetadataHandler.GetSetMetadata(this.cls.constructor as Class, key, this.handler)
         return MetadataHandler.GetSetMetadata(this.cls, key)
     }
 
-    getInControllerContext(key: string) {
+    getInControllerContext<T>(key: string): T | undefined {
         return MetadataHandler.GetSetMetadata(this.handler ? this.cls.constructor as Class : this.cls, key)
     }
     
-    getAllMerged(key: string) {
+    getAllMerged<T>(key: string): Array<T> {
         if (this.handler) {
             const handlerMetadata = MetadataHandler.GetSetMetadata(this.cls.constructor as Class, key, this.handler)
             const controllerMetadata = MetadataHandler.GetSetMetadata(this.cls.constructor as Class, key)

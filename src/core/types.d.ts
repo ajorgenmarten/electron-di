@@ -28,3 +28,6 @@ export type HandlerMetadata = {
     channel: string
 }
 export type ParamMetadata = "event" | "payload" | "request"
+export interface Guard {
+    execute(...args: any[]): void | boolean | Promise<void | boolean>
+}

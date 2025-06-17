@@ -1,23 +1,17 @@
-import { ipcMain, IpcMainEvent, IpcMainInvokeEvent } from "electron";
-import { Container } from "./Container";
-import { MetadataHandler } from "./MetadataHandler";
-import { Class, GuardMetadata, Token, ParamMetadata } from "./types";
-import { Logger } from "./Logger";
-
-type InitializedControllerInfo = {
-    instance: any
-    context: Class
-    prefix: string
-}
-
-type ReflectorContext = {
-    controller: Class
-    handler?: string
-}
+import { ipcMain, IpcMainEvent, IpcMainInvokeEvent } from "electron"
+import { Container, ControllerInfo } from "./Container"
+import { Logger } from "./Logger"
+import { MetadataHandler } from "./MetadataHandler"
+import { Class, GuardMetadata, ParamMetadata, Token } from "./types"
 
 type ApplicationOptions = {
     logger?: boolean
-    overloadHandlers?: boolean
+    overloadHandler?: boolean
+}
+
+type ExecutionContext = {
+    event: IpcMainInvokeEvent | IpcMainEvent
+    payload: any
 }
 
 type CreateHandlerProps = {
@@ -28,43 +22,20 @@ type CreateHandlerProps = {
     method: string
 }
 
-type ExecutionContext = {
-    event: IpcMainInvokeEvent | IpcMainEvent
-    payload: any
-}
-
 class Application {
-    private guardsCache: Map<string, any> = new Map()
-    private applicationOptions: ApplicationOptions = { logger: false, overloadHandlers: false }
+    private options: ApplicationOptions = { logger: false, overloadHandler: false }
     private logger = Logger.Logger
+    private container;
 
-    constructor(private container: Container, options?: ApplicationOptions) { 
-        this.applicationOptions = { ...this.applicationOptions, ...options }
+    constructor(module: Class, options?: ApplicationOptions) {
+        if (options) this.options = {...this.options, ...options}
+        this.container = new Container(module)
         this.registerHandlers()
     }
-    
-    private initalizeControllers() {
-        const initializedControllers = new Map<Class, InitializedControllerInfo>();
 
-        for(const [controller, controllerInfo] of this.container.Controllers) {
-            const dependencies = controllerInfo.Dependencies.map(dep => this.container.resolve(dep, controllerInfo.Context, { reflectorContext: { controller } }))
-            const instance = new controller(...dependencies)
-            initializedControllers.set(controller, { context: controllerInfo.Context, instance, prefix: controllerInfo.Prefix });
-        }
-
-        return initializedControllers
-    }
-    private resolveGuard(guard: Token, scope: Class, reflectorContext: ReflectorContext) {
-        const cacheKey = `${guard.name}_${scope.name}_${reflectorContext.controller.name}_${reflectorContext.handler}`
-        if (this.guardsCache.has(cacheKey)) return this.guardsCache.get(cacheKey);
-        const resolvedGuard = this.container.resolve(guard, scope, { reflectorContext })
-        this.guardsCache.set(cacheKey, resolvedGuard)
-        return resolvedGuard
-    }
-
-    private extractGuards(initializedControllerInfo: InitializedControllerInfo, method: string) {
-        const controllerGuards = MetadataHandler.GetGuardMetadata(initializedControllerInfo.instance.constructor) || []
-        const handlerGuards = MetadataHandler.GetGuardMetadata(initializedControllerInfo.instance.constructor, method) || []
+    private extractGuards(controller: ControllerInfo & { Class: Class }, method: string) {
+        const controllerGuards = MetadataHandler.GetGuardMetadata(controller.Class) || []
+        const handlerGuards = MetadataHandler.GetGuardMetadata(controller.Class, method) || []
 
         const separeGuardCallback = (previous: any[][], current: GuardMetadata) => {
             if (current.type === 'before') previous[0].push(current.provider)
@@ -76,8 +47,8 @@ class Application {
 
         const handlerGuardSeparated = handlerGuards.reduce(separeGuardCallback, [[], []])
 
-        const guardResolveControllerContext = (guard: Token) => this.resolveGuard(guard, initializedControllerInfo.context, { controller: initializedControllerInfo.instance.constructor })
-        const guardResolveHandlerContext = (guard: Token) => this.resolveGuard(guard, initializedControllerInfo.context, { controller: initializedControllerInfo.instance, handler: method })
+        const guardResolveControllerContext = (guard: Token) => this.container.resolve(guard, controller.Context, controller.Class )
+        const guardResolveHandlerContext = (guard: Token) => this.container.resolve(guard, controller.Context, controller.Class, method )
 
         const beforeGuards = [
             ...controllerGuardsSeparated[0].map(guardResolveControllerContext),
@@ -103,7 +74,7 @@ class Application {
 
     private async executeBeforeGuards(guards: any[], context: ExecutionContext) {
         for(const guard of guards) {
-            const params: ParamMetadata[] = MetadataHandler.GetParamsMetadata(guard.constructor, 'execute') || []
+            const params: ParamMetadata[] = MetadataHandler.GetParamsMetadata(guard, 'execute') || []
             const result = await guard.execute(...this.resolveParams(params, context))
             if (result === false) return false
         }
@@ -127,10 +98,10 @@ class Application {
 
     private createHandler(props: CreateHandlerProps) {
         return async (event: IpcMainInvokeEvent | IpcMainEvent, payload: any) => {
-            this.applicationOptions.logger && this.logger.info(`[${props.fullChannel}] => ${props.controllerInstance.constructor.name}().${props.method}`)
+            this.options.logger && this.logger.info(`[REQUESTED: ${props.fullChannel}] => ${props.controllerInstance.constructor.name}().${props.method}`)
 
             if(typeof payload !== 'object' && typeof payload !== 'undefined') {
-                this.applicationOptions.logger && this.logger.warn(`The payload isn't an object and will resolve to undefined`)
+                this.options.logger && this.logger.warn(`The payload isn't an object and will resolve to undefined`)
                 payload = undefined
             }
 
@@ -154,7 +125,7 @@ class Application {
 
             this.executeAfterGuards(props.afterGuards, executionContext, props.fullChannel)
 
-            this.applicationOptions.logger && this.logger.debug(`[Result ${props.fullChannel}]`, result)
+            this.options.logger && this.logger.debug(`[Result ${props.fullChannel}]`, result)
 
             return result;
 
@@ -162,31 +133,30 @@ class Application {
     }
 
     private registerHandlers() {
-        const initializedControllers = this.initalizeControllers()
-
-        for (const [controllerClass, initializedControllerInfo] of initializedControllers) {
-            const controllerMethods = Object.getOwnPropertyNames(controllerClass.prototype).filter(name => name !== 'constructor')
-
+        for(const [controllerClass, controllerInfo] of this.container.Controllers) {
+            const dependencies = MetadataHandler.GetParamTypes(controllerClass) ?? []
+            const resolvedDependencies = dependencies.map(dependency => this.container.resolve(dependency, controllerInfo.Context, controllerClass))
+            
+            const controllerInstance = new controllerClass(...resolvedDependencies)
+        
+            const controllerMethods = Object.getOwnPropertyNames(controllerClass.prototype).filter(name => name !== "constructor")
             for (const controllerMethod of controllerMethods) {
-                const handlerMetadata = MetadataHandler.GetHandlerMetadata(initializedControllerInfo.instance, controllerMethod)
-
+                const handlerMetadata = MetadataHandler.GetHandlerMetadata(controllerInstance, controllerMethod)
                 if (!handlerMetadata) continue
 
-                const { beforeGuards, afterGuards } = this.extractGuards(initializedControllerInfo, controllerMethod)
-
-                const fullChannel = [initializedControllerInfo.prefix, handlerMetadata.channel].filter(Boolean).join(':')
-
-                if(ipcMain.listeners(fullChannel).length > 0 && this.applicationOptions.overloadHandlers === false)
+                const fullChannel = [controllerInfo.Prefix, handlerMetadata.channel].filter(Boolean).join(':')
+                if (ipcMain.listeners(fullChannel).length > 0 && this.options.overloadHandler === false) 
                     throw new Error(`Duplicate handler for channel: "${fullChannel}"`)
 
+                const { beforeGuards, afterGuards } = this.extractGuards({ ...controllerInfo, Class: controllerClass }, controllerMethod)
+
                 const handler = this.createHandler({
-                    afterGuards,
                     beforeGuards,
-                    controllerInstance: initializedControllerInfo.instance,
+                    afterGuards,
+                    controllerInstance,
                     fullChannel,
                     method: controllerMethod
                 })
-
                 if (handlerMetadata.type === 'invoke') ipcMain.handle(fullChannel, handler)
                 else ipcMain.on(fullChannel, handler)
 
@@ -197,8 +167,8 @@ class Application {
 }
 
 export class ElectronDI {
-    static createApp(moduleInit: Class, options?: ApplicationOptions) {
-        const app = new Application(new Container(moduleInit), options)
+    static createApp(module: Class, options?: ApplicationOptions) {
+        const app = new Application(module, options)
         return app
     }
 }

@@ -4,8 +4,9 @@ export function applyDecorator(...decorators: (ClassDecorator | MethodDecorator)
     let sortedDecorators: (ClassDecorator | MethodDecorator)[] = []
     for (const decorator of decorators) {
         if (decorator instanceof After || decorator instanceof Before)
+            sortedDecorators.push(decorator)
+        else 
             sortedDecorators = [decorator, ...sortedDecorators]
-        else sortedDecorators.push(decorator)
     }
     return (target: Object | Function, property?: string | undefined, descriptor?: PropertyDescriptor) => {
         for(const decorator of sortedDecorators) {
